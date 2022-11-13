@@ -27,6 +27,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+/* List of processes in sleep. */
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -108,6 +110,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -220,6 +223,7 @@ void
 thread_block (void) {
 	ASSERT (!intr_context ());
 	ASSERT (intr_get_level () == INTR_OFF);
+	
 	thread_current ()->status = THREAD_BLOCKED;
 	schedule ();
 }
@@ -305,6 +309,20 @@ thread_yield (void) {
 	if (curr != idle_thread)
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
+	intr_set_level (old_level);
+}
+
+void
+thread_sleep (void) {
+	struct thread *curr = thread_current ();
+	enum intr_level old_level;
+	ASSERT (!intr_context ());
+
+	old_level = intr_disable ();
+	if (curr != idle_thread) {
+		list_push_back(&sleep_list, &curr->elem);
+		thread_block();
+	}
 	intr_set_level (old_level);
 }
 
