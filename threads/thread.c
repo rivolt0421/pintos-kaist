@@ -313,17 +313,39 @@ thread_yield (void) {
 }
 
 void
-thread_sleep (void) {
+thread_sleep (int64_t ticks) {
 	struct thread *curr = thread_current ();
 	enum intr_level old_level;
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
 	if (curr != idle_thread) {
+		curr->time_to_wake_up = ticks;
 		list_push_back(&sleep_list, &curr->elem);
 		thread_block();
 	}
 	intr_set_level (old_level);
+}
+
+void
+thread_wakeup (int64_t ticks) {
+	struct list_elem *node = list_begin(&sleep_list);
+	struct list_elem *end_node = list_end(&sleep_list);
+	struct list_elem *tmp;
+	struct thread *t;
+
+	ASSERT(intr_context());
+
+	while (node != end_node) {
+		tmp = node;
+		node = list_next(tmp);
+
+		t = list_entry(tmp, struct thread, elem);
+		if (t->time_to_wake_up <= ticks) {
+			list_remove(tmp);
+			thread_unblock(t);
+		}
+	}
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
