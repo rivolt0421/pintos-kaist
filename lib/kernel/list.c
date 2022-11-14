@@ -1,4 +1,5 @@
 #include "list.h"
+#include "threads/thread.h"
 #include "../debug.h"
 
 /* Our doubly linked lists have two header elements: the "head"
@@ -486,4 +487,11 @@ list_min (struct list *list, list_less_func *less, void *aux) {
 				min = e;
 	}
 	return min;
+}
+
+bool compare (const struct list_elem *a, const struct list_elem *b, void *aux) {
+	struct thread *thread_a = list_entry(a, struct thread, elem);
+	struct thread *thread_b = list_entry(b, struct thread, elem);
+
+	return (thread_a->priority < thread_b->priority);
 }
