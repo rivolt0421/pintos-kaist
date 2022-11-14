@@ -352,12 +352,14 @@ thread_wakeup (int64_t ticks) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+	/* 현재 스레드가 더 이상 우선순위를 가지고 있지 않으면, 양보해야 함. <- 여기서구현?? */
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) {
 	return thread_current ()->priority;
+	/* priority donation의 과정에서는, 가장 높은 (기부된)우선순위를 반환해야 함 */
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -460,8 +462,22 @@ static struct thread *
 next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;
-	else
-		return list_entry (list_pop_front (&ready_list), struct thread, elem);
+	else {
+		struct list_elem *node = list_begin(&ready_list);
+		struct list_elem *end_node = list_end(&ready_list);
+		struct thread *highest_thread, *tmp;
+
+		highest_thread = list_entry(node, struct thread, elem); // 초기값
+		while (node != end_node) {
+			tmp = list_entry(node, struct thread, elem);
+			if (highest_thread->priority < tmp->priority)
+				highest_thread = tmp;
+			node = list_next(node);
+			printf("무한으로 즐겨요\n");
+		}
+		return highest_thread;
+		// return list_entry (list_pop_front (&ready_list), struct thread, elem);
+	}
 }
 
 /* Use iretq to launch the thread */
