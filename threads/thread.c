@@ -355,7 +355,12 @@ thread_wakeup (int64_t ticks) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+	int tmp = thread_current()->priority;
 	thread_current ()->priority = new_priority;
+
+	if (new_priority < tmp)
+		thread_yield();
+
 	/* 현재 스레드가 더 이상 우선순위를 가지고 있지 않으면, 양보해야 함. <- 여기서구현?? */
 }
 
