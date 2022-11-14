@@ -190,12 +190,23 @@ lock_init (struct lock *lock) {
    we need to sleep. */
 void
 lock_acquire (struct lock *lock) {
+
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
-	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
+	if (!lock_try_acquire(lock)) {
+		struct thread *holder;
+		holder = lock->holder;
+		holder->priority = thread_current()->priority;
+		sema_down (&lock->semaphore);  // sleep에 빠짐.
+
+		lock->holder = thread_current ();
+		lock->holder_priority = lock->holder->priority;
+	}
+	else {
+		lock->holder_priority = lock->holder->priority;
+	}
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -228,6 +239,7 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
+	thread_current()->priority = lock->holder_priority;
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 }
