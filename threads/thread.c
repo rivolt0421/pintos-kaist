@@ -473,8 +473,8 @@ next_thread_to_run (void) {
 			if (highest_thread->priority < tmp->priority)
 				highest_thread = tmp;
 			node = list_next(node);
-			printf("무한으로 즐겨요\n");
 		}
+		list_remove(&(highest_thread->elem));
 		return highest_thread;
 		// return list_entry (list_pop_front (&ready_list), struct thread, elem);
 	}
