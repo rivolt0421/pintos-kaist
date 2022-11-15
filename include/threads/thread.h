@@ -93,6 +93,7 @@ struct thread {
 	int priority;                       /* Priority. */
 
 	int64_t time_to_wake_up;			/* wake up time after timer_sleep() called */
+	int prev_priority;                  /* lock_acquire하는 시점의 쓰레드의 원래 priority 값 */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */

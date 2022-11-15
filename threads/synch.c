@@ -177,7 +177,6 @@ lock_init (struct lock *lock) {
 	ASSERT (lock != NULL);
 
 	lock->holder = NULL;
-	lock->prev_priority = -1;
 	sema_init (&lock->semaphore, 1);
 }
 
@@ -197,10 +196,9 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!lock_held_by_current_thread (lock));
 
 	if (!lock_try_acquire(lock)) {
-		struct thread *holder;
-		holder = lock->holder;
-		if (lock->prev_priority < 0)
-			lock->prev_priority = holder->priority;
+		struct thread *holder = lock->holder;
+		if (holder->prev_priority < 0)
+			holder->prev_priority = holder->priority;
 		holder->priority = thread_current()->priority;  // donation하는 line
 		sema_down (&lock->semaphore);                   // sleep에 빠짐.
 
@@ -237,14 +235,29 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
-
-	if (lock->prev_priority >= 0) {
-		thread_current()->priority = lock->prev_priority;
-		lock->prev_priority = -1;
+	struct thread *holder = lock->holder;
+	if (holder->prev_priority >= 0) {
+		int max_priority = waiters_max_priority(lock);
+		if (thread_current()->priority <= max_priority) {
+			thread_current()->priority = holder->prev_priority;
+		}
+		holder->prev_priority = -1;
 	}
-		
+
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
+}
+
+/* lock->semaphore.waiters 안에 있는 thread들의 우선순위 중 최댓값을 반환합니다.
+   만약 waiters에 원소가 없다면 -1을 반환합니다. */
+int
+waiters_max_priority (struct lock *lock) {
+	struct list *waiters = &(lock->semaphore.waiters);
+	struct list_elem *tmp;
+	tmp = list_max(waiters, compare, NULL);
+	if (tmp == list_end(waiters))
+		return -1;
+	return list_entry(tmp, struct thread, elem)->priority;
 }
 
 /* Returns true if the current thread holds LOCK, false
