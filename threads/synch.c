@@ -201,7 +201,10 @@ lock_acquire (struct lock *lock) {
 		holder = lock->holder;
 		if (lock->prev_priority < 0)
 			lock->prev_priority = holder->priority;
-		holder->priority = thread_current()->priority;  // donation하는 line
+		/* begin donation */
+		holder->priority = thread_current()->priority;
+		list_push_back(&holder->donors, &thread_current()->elem_d);
+		/* end donation */
 		sema_down (&lock->semaphore);                   // sleep에 빠짐.
 
 		lock->holder = thread_current ();
@@ -237,6 +240,16 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
+
+	struct list *donors = &(thread_current()->donors);
+	struct list_elem *p = list_begin(donors);
+	struct list_elem *tail = list_tail(donors);
+	int curr_priority = thread_current()->priority;
+	while (p != tail) {
+		
+		if (curr_priority < )
+		p = list_next(donors);
+	}
 
 	if (lock->prev_priority >= 0) {
 		thread_current()->priority = lock->prev_priority;
