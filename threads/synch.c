@@ -238,10 +238,12 @@ lock_release (struct lock *lock) {
 	struct thread *holder = lock->holder;
 	if (holder->prev_priority >= 0) {
 		int max_priority = waiters_max_priority(lock);
-		if (thread_current()->priority <= max_priority) {
-			thread_current()->priority = holder->prev_priority;
+		if (max_priority != -1) {
+			if (thread_current()->priority <= max_priority) {
+				thread_current()->priority = holder->prev_priority;
+			}
+			holder->prev_priority = -1;
 		}
-		holder->prev_priority = -1;
 	}
 
 	lock->holder = NULL;
