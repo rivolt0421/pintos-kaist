@@ -251,7 +251,7 @@ thread_unblock (struct thread *t) {
 	// if (t != initial_thread && 
 	// 	t->priority > thread_current()->priority)
 	// 	thread_yield();
-	if (t->priority > thread_current()->priority)
+	if (!intr_context() && t->priority > thread_current()->priority)
 		thread_yield();
 
 }

@@ -177,6 +177,7 @@ lock_init (struct lock *lock) {
 	ASSERT (lock != NULL);
 
 	lock->holder = NULL;
+	lock->prev_priority = -1;
 	sema_init (&lock->semaphore, 1);
 }
 
@@ -198,7 +199,8 @@ lock_acquire (struct lock *lock) {
 	if (!lock_try_acquire(lock)) {
 		struct thread *holder;
 		holder = lock->holder;
-		lock->prev_priority = holder->priority;
+		if (lock->prev_priority < 0)
+			lock->prev_priority = holder->priority;
 		holder->priority = thread_current()->priority;  // donation하는 line
 		sema_down (&lock->semaphore);                   // sleep에 빠짐.
 
@@ -236,8 +238,10 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
-	if (lock->prev_priority)
+	if (lock->prev_priority >= 0) {
 		thread_current()->priority = lock->prev_priority;
+		lock->prev_priority = -1;
+	}
 		
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
