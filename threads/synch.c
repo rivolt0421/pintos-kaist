@@ -255,7 +255,7 @@ lock_release (struct lock *lock) {
 
 	if(lock->is_hyped) {
 		struct list_elem *e = list_begin(donor_list);
-		int max_priority = -1;
+		int max_priority = holder->original_priority;
 
 		while (e != list_end (donor_list)) {
 			struct thread *t = list_entry(e, struct thread, elem_d_luffy);
@@ -269,12 +269,7 @@ lock_release (struct lock *lock) {
 			}
 		}
 
-		if (max_priority >= 0) {
-			holder->priority = max_priority;
-		}
-		else {
-			holder->priority = holder->original_priority;
-		}
+		holder->priority = max_priority;
 		
 		lock->is_hyped = false;
 	}
