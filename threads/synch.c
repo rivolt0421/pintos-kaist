@@ -212,6 +212,7 @@ lock_acquire (struct lock *lock) {
 	}
 }
 
+/* おいおい、金さん、土地の飼い慣らしはどうするんだ？ */
 void
 narashi (struct thread *holder, int priority) {
 	while (holder->wanted) {
