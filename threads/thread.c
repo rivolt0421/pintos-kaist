@@ -373,7 +373,6 @@ thread_set_priority (int new_priority) {
 int
 thread_get_priority (void) {
 	return thread_current ()->priority;
-	/* priority donation의 과정에서는, 가장 높은 (기부된)우선순위를 반환해야 함 */
 }
 
 /* Sets the current thread's nice value to NICE. */
