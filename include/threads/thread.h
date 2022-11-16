@@ -100,7 +100,7 @@ struct thread {
 	/* For donation */
 	int original_priority;
 	struct lock *wanted;
-	struct list *donor_list;
+	struct list donor_list;
 	struct list_elem elem_d_luffy;
 
 

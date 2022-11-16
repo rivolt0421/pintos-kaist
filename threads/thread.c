@@ -466,7 +466,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	/* For donation */
 	t->original_priority = priority;
-	struct lock *wanted = NULL;
+	t->wanted = NULL;
 	list_init(&t->donor_list);
 }
 
