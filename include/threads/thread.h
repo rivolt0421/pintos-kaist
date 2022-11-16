@@ -92,10 +92,17 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
-	int64_t time_to_wake_up;			/* wake up time after timer_sleep() called */
-
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	
+	int64_t time_to_wake_up;			/* wake up time after timer_sleep() called */
+
+	/* For donation */
+	int original_priority;
+	struct lock *wanted;
+	struct list *donor_list;
+	struct list_elem elem_d_luffy;
+
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

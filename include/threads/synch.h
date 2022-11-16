@@ -20,7 +20,7 @@ void sema_self_test (void);
 struct lock {
 	struct thread *holder;      /* Thread holding lock (for debugging). */
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
-	int prev_priority;      /* lock을 acquire하는 시점의 holder의 priority 값 */
+	bool is_hyped;				/* holder가 있는 상태에서 acquire를 또 시도당하면 true */
 };
 
 void lock_init (struct lock *);

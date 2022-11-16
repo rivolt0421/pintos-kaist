@@ -31,6 +31,7 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/malloc.h"
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -177,8 +178,8 @@ lock_init (struct lock *lock) {
 	ASSERT (lock != NULL);
 
 	lock->holder = NULL;
-	lock->prev_priority = -1;
 	sema_init (&lock->semaphore, 1);
+	lock->is_hyped = false;
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -197,14 +198,25 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!lock_held_by_current_thread (lock));
 
 	if (!lock_try_acquire(lock)) {
-		struct thread *holder;
-		holder = lock->holder;
-		if (lock->prev_priority < 0)
-			lock->prev_priority = holder->priority;
-		holder->priority = thread_current()->priority;  // donation하는 line
+		lock->is_hyped = true;
+		struct thread *holder = lock->holder;
+
+		thread_current()->wanted = lock;	// wanted에 원하는 lock 명시
+		list_push_back(&(holder->donor_list), &(thread_current()->elem_d_luffy));
+		holder->priority = thread_current()->priority;	// ! donation !
+		narashi(holder, thread_current()->priority);	// for nested donation
+
 		sema_down (&lock->semaphore);                   // sleep에 빠짐.
 
 		lock->holder = thread_current ();
+	}
+}
+
+void
+narashi (struct thread *holder, int priority) {
+	while (holder->wanted) {
+		holder = holder->wanted->holder;
+		holder->priority = priority;
 	}
 }
 
@@ -237,15 +249,40 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
+	
+	struct thread *holder = lock->holder;
+	struct list *donor_list = &holder->donor_list;
 
-	if (lock->prev_priority >= 0) {
-		thread_current()->priority = lock->prev_priority;
-		lock->prev_priority = -1;
+	if(lock->is_hyped) {
+		struct list_elem *e = list_begin(donor_list);
+		int max_priority = -1;
+
+		while (e != list_end (donor_list)) {
+			struct thread *t = list_entry(e, struct thread, elem_d_luffy);
+			if (lock == t->wanted) {	// 현재 release하는 lock이 누군가의 wanted 라면,
+				e = list_remove(e);
+			}
+			else {						// 
+				if (max_priority < t->priority)
+					max_priority = t->priority;
+				e = list_next(e);
+			}
+		}
+
+		if (max_priority >= 0) {
+			holder->priority = max_priority;
+		}
+		else {
+			holder->priority = holder->original_priority;
+		}
+		
+		lock->is_hyped = false;
 	}
 		
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 }
+
 
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
