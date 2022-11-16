@@ -1,9 +1,9 @@
 # -*- makefile -*-
 
 # Test names.
-tests/threads/mlfqs_TESTS = $(addprefix tests/threads/mlfqs/,mlfqs-load-1 \
-mlfqs-load-60 mlfqs-load-avg mlfqs-recent-1 mlfqs-fair-2	\
-mlfqs-fair-20 mlfqs-nice-2 mlfqs-nice-10 mlfqs-block)
+    #tests/threads/mlfqs_TESTS = $(addprefix tests/threads/mlfqs/,mlfqs-load-1 \
+    #mlfqs-load-60 mlfqs-load-avg mlfqs-recent-1 mlfqs-fair-2	\
+    #mlfqs-fair-20 mlfqs-nice-2 mlfqs-nice-10 mlfqs-block)
 
 # Sources for tests.
 
