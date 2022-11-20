@@ -173,16 +173,12 @@ process_exec (void *f_name) {
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
-	parse_argument(f_name, &_if);
-
 	/* We first kill the current context */
 	process_cleanup ();
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
-	
-	
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
@@ -457,14 +453,14 @@ parse_argument (void *f_name, struct intr_frame *if_) {
 	token = strtok_r ((char *)f_name, " ", &save_ptr);
 	while (token != NULL) {
 		rsp -= strlen(token) + 1;
-		strlcpy((char *)rsp, token, strlen(token));
+		strlcpy(rsp, token, LOADER_ARGS_LEN+1);
 		argv[argc++] = rsp;
 
 		token = strtok_r (NULL, " ", &save_ptr);
 	}
 
 	/* word alignment */
-	while ((rsp & 0x15) != 0) {
+	while ((rsp & 15) != 0) {
 		rsp--;
 		*(char *)rsp = 0;
 	}
