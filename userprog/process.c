@@ -189,6 +189,44 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
+/*
+	예시 : args-many   1 2 3 4 5 6 7
+*/
+void
+parse_argument (void *f_name, uintptr_t *rsp) {
+	static char *argv[LOADER_ARGS_LEN / 2 + 1];
+	char *token, *save_ptr;
+	int argc = 0;
+
+	for (token = strtok_r (f_name, " ", &save_ptr); token != NULL;
+		token = strtok_r (NULL, " ", &save_ptr)) {
+			rsp -= strlen(token) + 1;
+			strcpy((char *)rsp, token);
+			argc++;
+	}
+
+
+
+
+	char *p, *save_ptr;
+	size_t strsize;
+	int argument_count = 0;
+
+	while ((p = strtok_r (f_name, ' ', &save_ptr))) {
+		argument_count++;
+		*p = '\0';
+		strsize = strlen(f_name) + 1;
+		strlcpy(argv, p, strsize);
+		
+
+
+
+		// for (; *p != ' '; p++)
+		// 	save_ptr++;
+	}
+
+}
+
 
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
