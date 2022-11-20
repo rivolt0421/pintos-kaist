@@ -173,12 +173,16 @@ process_exec (void *f_name) {
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
+	parse_argument(f_name, &_if);
+
 	/* We first kill the current context */
 	process_cleanup ();
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	
+	
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
@@ -189,43 +193,7 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
-/*
-	예시 : args-many   1 2 3 4 5 6 7
-*/
-void
-parse_argument (void *f_name, uintptr_t *rsp) {
-	static char *argv[LOADER_ARGS_LEN / 2 + 1];
-	char *token, *save_ptr;
-	int argc = 0;
 
-	for (token = strtok_r (f_name, " ", &save_ptr); token != NULL;
-		token = strtok_r (NULL, " ", &save_ptr)) {
-			rsp -= strlen(token) + 1;
-			strcpy((char *)rsp, token);
-			argc++;
-	}
-
-
-
-
-	char *p, *save_ptr;
-	size_t strsize;
-	int argument_count = 0;
-
-	while ((p = strtok_r (f_name, ' ', &save_ptr))) {
-		argument_count++;
-		*p = '\0';
-		strsize = strlen(f_name) + 1;
-		strlcpy(argv, p, strsize);
-		
-
-
-
-		// for (; *p != ' '; p++)
-		// 	save_ptr++;
-	}
-
-}
 
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -242,6 +210,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	timer_sleep(200);
 	return -1;
 }
 
@@ -366,12 +335,19 @@ load (const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
+	/* for parsing */
+	char *ptr;
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
+
+	// TODO : 널문자 끼워넣기 신공 ()
+	if((ptr = strchr((char *)file_name, ' '))){
+		*ptr = '\0';
+	}
 
 	/* Open executable file. */
 	file = filesys_open (file_name);
@@ -454,6 +430,10 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	 if(ptr){
+		*ptr = ' ';
+	 }
+	 parse_argument(file_name, if_);
 
 	success = true;
 
@@ -463,6 +443,53 @@ done:
 	return success;
 }
 
+/*
+	예시 : args-many   1 2 3 4 5 6 7
+*/
+void
+parse_argument (void *f_name, struct intr_frame *if_) {
+	uintptr_t rsp = if_->rsp;
+	char *argv[LOADER_ARGS_LEN / 2 + 1];
+	char *token, *save_ptr;
+	int argc = 0;
+
+	/* push token to user-stack and make argv */
+	token = strtok_r ((char *)f_name, " ", &save_ptr);
+	while (token != NULL) {
+		rsp -= strlen(token) + 1;
+		strlcpy((char *)rsp, token, strlen(token));
+		argv[argc++] = rsp;
+
+		token = strtok_r (NULL, " ", &save_ptr);
+	}
+
+	/* word alignment */
+	while ((rsp & 0x15) != 0) {
+		rsp--;
+		*(char *)rsp = 0;
+	}
+	
+	argv[argc] = 0;		// null pointer sentinel
+
+	/* rsp+8 16의 배수 align */
+	if (argc % 2 == 0) {
+		rsp -= 8;
+		*(uintptr_t *)rsp = 0;
+	}
+
+	/* push argv to user-stack */
+	int argv_size_b = (argc+1) * sizeof(char *);
+	rsp -= argv_size_b;
+	memcpy(rsp, argv, argv_size_b);
+
+	/* false return address */
+	rsp -= 8;
+	*(uintptr_t *)rsp = 0;
+	
+	if_->rsp = rsp;
+	if_->R.rdi = argc;
+	if_->R.rsi = rsp+8;
+}
 
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
