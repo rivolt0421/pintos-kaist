@@ -42,7 +42,7 @@ process_init (void) {
  * Notice that THIS SHOULD BE CALLED ONCE. */
 tid_t
 process_create_initd (const char *file_name) {
-	char *fn_copy;
+	char *fn_copy, *ptr;
 	tid_t tid;
 
 	/* Make a copy of FILE_NAME.
@@ -53,9 +53,18 @@ process_create_initd (const char *file_name) {
 	strlcpy (fn_copy, file_name, PGSIZE);
 
 	/* Create a new thread to execute FILE_NAME. */
+	if((ptr = strchr((char *)file_name, ' '))) {
+		*ptr = '\0';
+	}
+
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
+
+	if(ptr) {
+		*ptr = ' ';
+	}
+	
 	return tid;
 }
 
@@ -179,9 +188,9 @@ process_exec (void *f_name) {
 	process_cleanup ();
 
 	/* And then load the binary */
-	//lock_acquire(&filesys_lock);
+	lock_acquire(&filesys_lock);
 	success = load (file_name, &_if);
-	//lock_release(&filesys_lock);
+	lock_release(&filesys_lock);
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -222,7 +231,9 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	if (curr->pml4 != NULL){
+		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
+	}
 	process_cleanup ();
 }
 

@@ -61,7 +61,8 @@ void halt_syscall_handler (struct intr_frame *f) {
 } 
 
 void exit_syscall_handler (struct intr_frame *f) {
-
+	thread_current()->exit_code = f->R.rdi;
+	thread_exit();
 } 
 
 void fork_syscall_handler (struct intr_frame *f) {

@@ -4,7 +4,7 @@
 struct intr_frame;
 
 /* Lock used by allocate_tid(). */
-static struct lock filesys_lock;
+struct lock filesys_lock;
 
 void syscall_init (void);
 
