@@ -6,6 +6,7 @@
 #include "threads/loader.h"
 #include "userprog/gdt.h"
 #include "threads/flags.h"
+#include "threads/synch.h"
 #include "intrinsic.h"
 
 void syscall_entry (void);
@@ -35,12 +36,130 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
-	printf ("system call!\n");
-	thread_exit ();
+	syscall_handler_func *handler;
+
+	handler = syscall_handlers[f->R.rax];
+	if (handler) {
+		handler(f);		// handle system call.
+	}
+	else {
+		intr_dump_frame (f);
+		PANIC ("Unexpected system call");
+	}
+		
 }
+
+void halt_syscall_handler (struct intr_frame *f) {
+	power_off();
+} 
+
+void exit_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void fork_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void exec_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void wait_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void create_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void remove_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void open_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void filesize_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void read_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void write_syscall_handler (struct intr_frame *f) {
+	int fd = f->R.rdi;
+	const void *buffer = f->R.rsi;
+	unsigned size = f->R.rdx;
+
+	if (fd == STDOUT_FILENO) {
+		putbuf(buffer, size);
+	}
+
+} 
+
+void seek_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void tell_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void close_syscall_handler (struct intr_frame *f) {
+
+} 
+
+void mmap_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void munmap_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void chdir_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void mkdir_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void readdir_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void isdir_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void inumber_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void symlink_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void dup2_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void mount_syscall_handler (struct intr_frame *f) {
+
+}  
+
+void umount_syscall_handler (struct intr_frame *f) {
+
+} 
+

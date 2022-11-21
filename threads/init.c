@@ -21,6 +21,7 @@
 #include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"

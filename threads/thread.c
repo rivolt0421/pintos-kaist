@@ -39,6 +39,7 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+
 /* Thread destruction requests */
 static struct list destruction_req;
 
