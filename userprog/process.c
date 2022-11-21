@@ -18,6 +18,7 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "lib/stdio.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -436,6 +437,9 @@ load (const char *file_name, struct intr_frame *if_) {
 done:
 	/* We arrive here whether the load is successful or not. */
 	file_close (file);
+
+	hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
+	
 	return success;
 }
 
@@ -475,6 +479,7 @@ parse_argument (void *f_name, struct intr_frame *if_) {
 
 	/* push argv to user-stack */
 	int argv_size_b = (argc+1) * sizeof(char *);
+	printf("%d\n", argv_size_b);
 	rsp -= argv_size_b;
 	memcpy(rsp, argv, argv_size_b);
 
