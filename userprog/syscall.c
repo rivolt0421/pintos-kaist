@@ -8,6 +8,8 @@
 #include "threads/flags.h"
 #include "threads/synch.h"
 #include "intrinsic.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -86,7 +88,23 @@ void remove_syscall_handler (struct intr_frame *f) {
 } 
 
 void open_syscall_handler (struct intr_frame *f) {
-
+	char *file_name = f->R.rdi;
+	struct file *fdt = thread_current()->fdt;
+	char idx;
+	for (idx = 2; idx < 17; idx++) {
+		if (!fdt[idx]) {								// found empty entry
+			if (fdt[idx] = filesys_open(file_name)) {	// if success to open
+				f->R.rax = idx;
+				return;
+			}
+			else {										// if fail to open
+				f->R.rax = -1;
+				return;
+			}
+		}
+	}
+	/* File descriptor table is full. */
+	f->R.rax = -1;
 } 
 
 void filesize_syscall_handler (struct intr_frame *f) {
