@@ -60,6 +60,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 }
 
+/* This assertion should be used when
+   the argument sent by user is POINTER TYPE */
 void assert_valid_address(void * uaddr) {
 	/* invalid if uaddr is null or kernel virtual address */
 	if (!uaddr || is_kernel_vaddr(uaddr)) {
@@ -74,10 +76,18 @@ void assert_valid_address(void * uaddr) {
 	}
 }
 
+/*
+ * void
+ * halt (void)
+ */
 void halt_syscall_handler (struct intr_frame *f) {
 	power_off();
 } 
 
+/*
+ * void
+ * exit (int status)
+ */
 void exit_syscall_handler (struct intr_frame *f) {
 	thread_current()->exit_code = f->R.rdi;
 	thread_exit();
@@ -106,7 +116,7 @@ void remove_syscall_handler (struct intr_frame *f) {
 /*
  * int 
  * open (const char *file)
-*/
+ */
 void open_syscall_handler (struct intr_frame *f) {
 	assert_valid_address(f->R.rdi);
 
@@ -133,7 +143,7 @@ void open_syscall_handler (struct intr_frame *f) {
 	for (char idx = 2; idx < 16; idx++) {
 		if (!fd_table[idx]) {	// 2번부터 빈 공간 선형 탐색
 			fd_table[idx] = file_opened;
-			f->R.rax = idx;
+			f->R.rax = idx;		// 유저에게 fd를 넘겨주는 순간
 			return;
 		}
 	}
@@ -142,8 +152,25 @@ void open_syscall_handler (struct intr_frame *f) {
 	f->R.rax = -1;
 } 
 
+/* 
+ * int
+ * filesize (int fd)
+ */
 void filesize_syscall_handler (struct intr_frame *f) {
+	int fd = f->R.rdi;
+	intptr_t *fd_table = thread_current()->fd_table;
 
+	/* Cannot find file mapped by fd */
+	if (fd < 2 || fd > 15 || fd_table[fd] == NULL) {
+		f->R.rax = -1;
+		return;
+	}
+
+	lock_acquire(&filesys_lock);
+	int32_t f_len = file_length(fd_table[fd]);
+	lock_release(&filesys_lock);
+
+	f->R.rax = f_len;
 } 
 
 void read_syscall_handler (struct intr_frame *f) {
@@ -169,8 +196,12 @@ void tell_syscall_handler (struct intr_frame *f) {
 
 } 
 
+/* 
+ * void
+ * close (int fd)
+ */
 void close_syscall_handler (struct intr_frame *f) {
-
+	
 } 
 
 void mmap_syscall_handler (struct intr_frame *f) {
