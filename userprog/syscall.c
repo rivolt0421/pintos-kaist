@@ -129,7 +129,7 @@ void create_syscall_handler (struct intr_frame *f) {
 	lock_acquire(&filesys_lock);
 	bool success = filesys_create(name, initial_size);
 	lock_release(&filesys_lock);
-	
+
 	f->R.rax = success;
 } 
 
@@ -138,7 +138,14 @@ void create_syscall_handler (struct intr_frame *f) {
  * remove (const char *file)
  */
 void remove_syscall_handler (struct intr_frame *f) {
+	assert_valid_address(f->R.rdi);
+	
+	char *name = f->R.rdi;
+	lock_acquire(&filesys_lock);
+	bool success = filesys_remove(name);
+	lock_release(&filesys_lock);
 
+	f->R.rax = success;
 } 
 
 /*
@@ -207,7 +214,32 @@ void filesize_syscall_handler (struct intr_frame *f) {
  * read (int fd, void *buffer, unsigned size)
  */
 void read_syscall_handler (struct intr_frame *f) {
+	assert_valid_address(f->R.rsi);
 
+	int fd = f->R.rdi;
+	char *buffer = f->R.rsi;
+	unsigned size = f->R.rdx;
+	intptr_t *fd_table = thread_current()->fd_table;
+	int32_t read_bytes = 0;
+	int i = 0;
+
+	if (fd == STDIN_FILENO) {
+		while(size-- > 0) {
+			buffer[i++] = (char) input_getc();
+			read_bytes++;
+		}
+	}
+	else {
+		/* fd validity check */
+		if (fd < 0 || fd > 15 || fd_table[fd] == NULL) {
+			f->R.rax = -1;
+			return;
+		}
+		lock_acquire(&filesys_lock);
+		read_bytes = file_read(fd_table[fd], buffer, size);
+		lock_release(&filesys_lock);
+	}
+	f->R.rax = read_bytes;
 } 
 
 /* 
@@ -215,14 +247,29 @@ void read_syscall_handler (struct intr_frame *f) {
  * write (int fd, const void *buffer, unsigned size)
  */
 void write_syscall_handler (struct intr_frame *f) {
+	assert_valid_address(f->R.rsi);
+
 	int fd = f->R.rdi;
 	const void *buffer = f->R.rsi;
 	unsigned size = f->R.rdx;
+	intptr_t *fd_table = thread_current()->fd_table;
+	int32_t written_bytes = 0;
 
 	if (fd == STDOUT_FILENO) {
 		putbuf(buffer, size);
+		written_bytes = size;
 	}
-
+	else {
+		/* fd validity check */
+		if (fd < 0 || fd > 15 || fd_table[fd] == NULL) {
+			f->R.rax = -1;
+			return;
+		}
+		lock_acquire(&filesys_lock);
+		written_bytes = file_write(fd_table[fd], buffer, size);
+		lock_release(&filesys_lock);
+	}
+	f->R.rax = written_bytes;
 } 
 
 /* 
