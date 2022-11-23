@@ -114,17 +114,20 @@ void open_syscall_handler (struct intr_frame *f) {
 	uintptr_t *fd_table = thread_current()->fd_table;
 	uintptr_t *file_opened;
 
-	/* the file could not be opened */
+	/* check file_name and fd_count */
 	if (!file_name || thread_current()->fd_count >= 16) {
-			f->R.rax = -1;
-			return;
+		f->R.rax = -1;
+		return;
 	}
 	lock_acquire(&filesys_lock);
-	if (file_opened = filesys_open(file_name)) {
-			f->R.rax = -1;
-			return;
-	}
+	file_opened = filesys_open(file_name);
 	lock_release(&filesys_lock);
+
+	/* check the file has been successfully opened */
+	if (!file_opened) {
+		f->R.rax = -1;
+		return;
+	}
 	
 	/* find empty entry */
 	for (char idx = 2; idx < 16; idx++) {
