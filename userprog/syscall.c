@@ -201,7 +201,16 @@ void tell_syscall_handler (struct intr_frame *f) {
  * close (int fd)
  */
 void close_syscall_handler (struct intr_frame *f) {
-	
+	int fd = f->R.rdi;
+	uintptr_t *fd_table = thread_current()->fd_table;
+
+	/* fd validity check */
+	if (fd < 2 || fd > 15) {
+		f->R.rax = -1;
+		return;
+	}
+
+	fd_table[fd] = NULL;
 } 
 
 void mmap_syscall_handler (struct intr_frame *f) {
