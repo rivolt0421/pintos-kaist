@@ -122,9 +122,15 @@ void wait_syscall_handler (struct intr_frame *f) {
  * create (const char *file, unsigned initial_size)
  */
 void create_syscall_handler (struct intr_frame *f) {
+	assert_valid_address(f->R.rdi);
+
 	char *name = f->R.rdi;
 	unsigned initial_size = f->R.rsi;
-	filesys_create(name, initial_size);
+	lock_acquire(&filesys_lock);
+	bool success = filesys_create(name, initial_size);
+	lock_release(&filesys_lock);
+	
+	f->R.rax = success;
 } 
 
 /*
