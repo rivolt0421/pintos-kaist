@@ -93,28 +93,50 @@ void exit_syscall_handler (struct intr_frame *f) {
 	thread_exit();
 } 
 
+/*
+ * pid_t
+ * fork (const char *thread_name)
+ */
 void fork_syscall_handler (struct intr_frame *f) {
-
-} 
-
-void exec_syscall_handler (struct intr_frame *f) {
-
-} 
-
-void wait_syscall_handler (struct intr_frame *f) {
-
-} 
-
-void create_syscall_handler (struct intr_frame *f) {
-
-} 
-
-void remove_syscall_handler (struct intr_frame *f) {
 
 } 
 
 /*
  * int 
+ * exec (const char *file)
+ */
+void exec_syscall_handler (struct intr_frame *f) {
+
+} 
+
+/*
+ * int 
+ * wait (pid_t pid)
+ */
+void wait_syscall_handler (struct intr_frame *f) {
+
+} 
+
+/*
+ * bool
+ * create (const char *file, unsigned initial_size)
+ */
+void create_syscall_handler (struct intr_frame *f) {
+	char *name = f->R.rdi;
+	unsigned initial_size = f->R.rsi;
+	filesys_create(name, initial_size);
+} 
+
+/*
+ * bool
+ * remove (const char *file)
+ */
+void remove_syscall_handler (struct intr_frame *f) {
+
+} 
+
+/*
+ * int
  * open (const char *file)
  */
 void open_syscall_handler (struct intr_frame *f) {
@@ -144,12 +166,13 @@ void open_syscall_handler (struct intr_frame *f) {
 		if (!fd_table[idx]) {	// 2번부터 빈 공간 선형 탐색
 			fd_table[idx] = file_opened;
 			f->R.rax = idx;		// 유저에게 fd를 넘겨주는 순간
+			thread_current()->fd_count += 1;
 			return;
 		}
 	}
 
 	/* should not be reached */
-	f->R.rax = -1;
+	NOT_REACHED();
 } 
 
 /* 
@@ -160,7 +183,7 @@ void filesize_syscall_handler (struct intr_frame *f) {
 	int fd = f->R.rdi;
 	intptr_t *fd_table = thread_current()->fd_table;
 
-	/* Cannot find file mapped by fd */
+	/* fd validity check */
 	if (fd < 2 || fd > 15 || fd_table[fd] == NULL) {
 		f->R.rax = -1;
 		return;
@@ -173,10 +196,18 @@ void filesize_syscall_handler (struct intr_frame *f) {
 	f->R.rax = f_len;
 } 
 
+/* 
+ * int
+ * read (int fd, void *buffer, unsigned size)
+ */
 void read_syscall_handler (struct intr_frame *f) {
 
 } 
 
+/* 
+ * int
+ * write (int fd, const void *buffer, unsigned size)
+ */
 void write_syscall_handler (struct intr_frame *f) {
 	int fd = f->R.rdi;
 	const void *buffer = f->R.rsi;
@@ -188,10 +219,18 @@ void write_syscall_handler (struct intr_frame *f) {
 
 } 
 
+/* 
+ * void
+ * seek (int fd, unsigned position)
+ */
 void seek_syscall_handler (struct intr_frame *f) {
 
 } 
 
+/* 
+ * unsigned
+ * tell (int fd)
+ */
 void tell_syscall_handler (struct intr_frame *f) {
 
 } 
@@ -205,54 +244,102 @@ void close_syscall_handler (struct intr_frame *f) {
 	uintptr_t *fd_table = thread_current()->fd_table;
 
 	/* fd validity check */
-	if (fd < 2 || fd > 15) {
-		f->R.rax = -1;
-		return;
-	}
+	if (fd < 2 || fd > 15 || fd_table[fd] == NULL)
+		return;	// silently fail...
+
+	lock_acquire(&filesys_lock);
+	file_close(fd_table[fd]);
+	lock_release(&filesys_lock);
 
 	fd_table[fd] = NULL;
+	ASSERT(thread_current()->fd_count > 2);
+	thread_current()->fd_count -= 1;
 } 
 
-void mmap_syscall_handler (struct intr_frame *f) {
-
-}  
-
-void munmap_syscall_handler (struct intr_frame *f) {
-
-}  
-
-void chdir_syscall_handler (struct intr_frame *f) {
-
-}  
-
-void mkdir_syscall_handler (struct intr_frame *f) {
-
-}  
-
-void readdir_syscall_handler (struct intr_frame *f) {
-
-}  
-
-void isdir_syscall_handler (struct intr_frame *f) {
-
-}  
-
-void inumber_syscall_handler (struct intr_frame *f) {
-
-}  
-
-void symlink_syscall_handler (struct intr_frame *f) {
-
-}  
-
+/* 
+ * int
+ * dup2 (int oldfd, int newfd)
+ */
 void dup2_syscall_handler (struct intr_frame *f) {
 
 }  
 
+/* 
+ * void *
+ * mmap (void *addr, size_t length, int writable, int fd, off_t offset)
+ */
+void mmap_syscall_handler (struct intr_frame *f) {
+
+}  
+
+/* 
+ * void
+ * munmap (void *addr)
+ */
+void munmap_syscall_handler (struct intr_frame *f) {
+
+}  
+
+/* 
+ * bool
+ * chdir (const char *dir)
+ */
+void chdir_syscall_handler (struct intr_frame *f) {
+
+}  
+
+/* 
+ * bool
+ * mkdir (const char *dir)
+ */
+void mkdir_syscall_handler (struct intr_frame *f) {
+
+}  
+
+/* 
+ * bool
+ * readdir (int fd, char name[READDIR_MAX_LEN + 1])
+ */
+void readdir_syscall_handler (struct intr_frame *f) {
+
+}  
+
+/* 
+ * bool
+ * isdir (int fd)
+ */
+void isdir_syscall_handler (struct intr_frame *f) {
+
+}  
+
+/* 
+ * int
+ * inumber (int fd)
+ */
+void inumber_syscall_handler (struct intr_frame *f) {
+
+}  
+
+/* 
+ * int
+ * symlink (const char* target, const char* linkpath)
+ */
+void symlink_syscall_handler (struct intr_frame *f) {
+
+}  
+
+/* 
+ * int
+ * mount (const char *path, int chan_no, int dev_no)
+ */
 void mount_syscall_handler (struct intr_frame *f) {
 
 }  
 
+/* 
+ * int
+ * umount (const char *path)
+ */
 void umount_syscall_handler (struct intr_frame *f) {
 
 } 

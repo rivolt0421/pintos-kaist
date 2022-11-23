@@ -141,7 +141,7 @@ close (int fd) {
 }
 
 int
-dup2 (int oldfd, int newfd){
+dup2 (int oldfd, int newfd) {
 	return syscall2 (SYS_DUP2, oldfd, newfd);
 }
 
