@@ -33,6 +33,14 @@ static void __do_fork (void *);
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
+
+	/* initialize fd_table */
+	intptr_t *fd_table = current->fd_table;
+	char i = 0;
+	while(i < 16) {	// 0 ~ 15 (16개)
+		fd_table[i++] = 0;
+	}
+	current->fd_count = 2;	// 0 (STDIN_FILENO), 1 (STDOUT_FILENO)
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -57,7 +65,7 @@ process_create_initd (const char *file_name) {
 		*ptr = '\0';
 	}
 
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (file_name, PRI_DEFAULT+1, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 
@@ -219,6 +227,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+
 	timer_sleep(200);
 	return -1;
 }

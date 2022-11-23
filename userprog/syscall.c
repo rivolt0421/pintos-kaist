@@ -10,6 +10,8 @@
 #include "intrinsic.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "threads/vaddr.h"
+#include "threads/mmu.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -58,6 +60,20 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 }
 
+void assert_valid_address(void * uaddr) {
+	/* invalid if uaddr is null or kernel virtual address */
+	if (!uaddr || is_kernel_vaddr(uaddr)) {
+		thread_current()->exit_code = -1;
+		thread_exit();
+	}
+
+	/* just check if uaddr is actually mapped to some physical address */
+	if (!pml4_get_page(thread_current()->pml4, uaddr)) {
+		thread_current()->exit_code = -1;
+		thread_exit();
+	}
+}
+
 void halt_syscall_handler (struct intr_frame *f) {
 	power_off();
 } 
@@ -87,23 +103,39 @@ void remove_syscall_handler (struct intr_frame *f) {
 
 } 
 
+/*
+ * int 
+ * open (const char *file)
+*/
 void open_syscall_handler (struct intr_frame *f) {
+	assert_valid_address(f->R.rdi);
+
 	char *file_name = f->R.rdi;
-	struct file *fdt = thread_current()->fdt;
-	char idx;
-	for (idx = 2; idx < 17; idx++) {
-		if (!fdt[idx]) {								// found empty entry
-			if (fdt[idx] = filesys_open(file_name)) {	// if success to open
-				f->R.rax = idx;
-				return;
-			}
-			else {										// if fail to open
-				f->R.rax = -1;
-				return;
-			}
+	uintptr_t *fd_table = thread_current()->fd_table;
+	uintptr_t *file_opened;
+
+	/* the file could not be opened */
+	if (!file_name || thread_current()->fd_count >= 16) {
+			f->R.rax = -1;
+			return;
+	}
+	lock_acquire(&filesys_lock);
+	if (file_opened = filesys_open(file_name)) {
+			f->R.rax = -1;
+			return;
+	}
+	lock_release(&filesys_lock);
+	
+	/* find empty entry */
+	for (char idx = 2; idx < 16; idx++) {
+		if (!fd_table[idx]) {	// 2번부터 빈 공간 선형 탐색
+			fd_table[idx] = file_opened;
+			f->R.rax = idx;
+			return;
 		}
 	}
-	/* File descriptor table is full. */
+
+	/* should not be reached */
 	f->R.rax = -1;
 } 
 

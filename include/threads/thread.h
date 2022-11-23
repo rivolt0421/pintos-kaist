@@ -9,7 +9,6 @@
 #include "vm/vm.h"
 #endif
 
-
 /* States in a thread's life cycle. */
 enum thread_status {
 	THREAD_RUNNING,     /* Running thread. */
@@ -110,7 +109,8 @@ struct thread {
 	char exit_code;
 
 	/* File descriptor table. */
-	struct file *fdt[16];
+	intptr_t fd_table[16];
+	char fd_count;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
