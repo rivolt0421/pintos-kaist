@@ -5,78 +5,23 @@ make tests/userprog/write-normal.result && make tests/userprog/write-bad-ptr.res
 
 
 
-make tests/userprog/args-none &&
-make tests/userprog/args-single &&
-make tests/userprog/args-multiple &&
-make tests/userprog/args-many &&
-make tests/userprog/args-dbl-space &&
+make tests/userprog/args-none.result && make tests/userprog/args-single.result && make tests/userprog/args-multiple.result && make tests/userprog/args-many.result && make tests/userprog/args-dbl-space.result
+make tests/userprog/halt.result && make tests/userprog/exit.result
+make tests/userprog/create-normal.result && make tests/userprog/create-empty.result && make tests/userprog/create-null.result && make tests/userprog/create-bad-ptr.result && make tests/userprog/create-long.result && make tests/userprog/create-exists.result && make tests/userprog/create-bound.result
+make tests/userprog/open-normal.result && make tests/userprog/open-missing.result && make tests/userprog/open-boundary.result && make tests/userprog/open-empty.result && make tests/userprog/open-null.result && make tests/userprog/open-bad-ptr.result && make tests/userprog/open-twice.result
+make tests/userprog/close-normal.result && make tests/userprog/close-twice.result && make tests/userprog/close-bad-fd.result
+make tests/userprog/read-normal.result && make tests/userprog/read-bad-ptr.result && make tests/userprog/read-boundary.result && make tests/userprog/read-zero.result && make tests/userprog/read-stdout.result && make tests/userprog/read-bad-fd.result
+make tests/userprog/write-normal.result && make tests/userprog/write-bad-ptr.result && make tests/userprog/write-boundary.result && make tests/userprog/write-zero.result && make tests/userprog/write-stdin.result && make tests/userprog/write-bad-fd.result
+make tests/userprog/bad-read.result && make tests/userprog/bad-write.result && make tests/userprog/bad-read2.result && make tests/userprog/bad-write2.result && make tests/userprog/bad-jump.result && make tests/userprog/bad-jump2.result
 
-make tests/userprog/halt &&
-make tests/userprog/exit &&
+make tests/userprog/fork-once.result && make tests/userprog/fork-multiple.result && make tests/userprog/fork-recursive.result && make tests/userprog/fork-read.result && make tests/userprog/fork-close.result && make tests/userprog/fork-boundary.result
+make tests/userprog/exec-once.result && make tests/userprog/exec-arg.result && make tests/userprog/exec-boundary.result && make tests/userprog/exec-missing.result && make tests/userprog/exec-bad-ptr.result && make tests/userprog/exec-read.result
+make tests/userprog/wait-simple.result && make tests/userprog/wait-twice.result && make tests/userprog/wait-killed.result && make tests/userprog/wait-bad-pid.result
+make tests/userprog/multi-recurse.result && make tests/userprog/multi-child-fd.result
+make tests/userprog/rox-simple.result && make tests/userprog/rox-child.result && make tests/userprog/rox-multichild.result
 
-make tests/userprog/create-normal &&
-make tests/userprog/create-empty &&
-make tests/userprog/create-null &&
-make tests/userprog/create-bad-ptr &&
-make tests/userprog/create-long &&
-make tests/userprog/create-exists &&
-make tests/userprog/create-bound &&
+/* except fork / wait / exec */
+make tests/userprog/args-none.result && make tests/userprog/args-single.result && make tests/userprog/args-multiple.result && make tests/userprog/args-many.result && make tests/userprog/args-dbl-space.result && make tests/userprog/halt.result && make tests/userprog/exit.result && make tests/userprog/create-normal.result && make tests/userprog/create-empty.result && make tests/userprog/create-null.result && make tests/userprog/create-bad-ptr.result && make tests/userprog/create-long.result && make tests/userprog/create-exists.result && make tests/userprog/create-bound.result && make tests/userprog/open-normal.result && make tests/userprog/open-missing.result && make tests/userprog/open-boundary.result && make tests/userprog/open-empty.result && make tests/userprog/open-null.result && make tests/userprog/open-bad-ptr.result && make tests/userprog/open-twice.result && make tests/userprog/close-normal.result && make tests/userprog/close-twice.result && make tests/userprog/close-bad-fd.result && make tests/userprog/read-normal.result && make tests/userprog/read-bad-ptr.result && make tests/userprog/read-boundary.result && make tests/userprog/read-zero.result && make tests/userprog/read-stdout.result && make tests/userprog/read-bad-fd.result && make tests/userprog/write-normal.result && make tests/userprog/write-bad-ptr.result && make tests/userprog/write-boundary.result && make tests/userprog/write-zero.result && make tests/userprog/write-stdin.result && make tests/userprog/write-bad-fd.result && make tests/userprog/bad-read.result && make tests/userprog/bad-write.result && make tests/userprog/bad-read2.result && make tests/userprog/bad-write2.result && make tests/userprog/bad-jump.result && make tests/userprog/bad-jump2.result
 
-make tests/userprog/open-normal &&
-make tests/userprog/open-missing &&
-make tests/userprog/open-boundary &&
-make tests/userprog/open-empty &&
-make tests/userprog/open-null &&
-make tests/userprog/open-bad-ptr &&
-make tests/userprog/open-twice &&
-
-make tests/userprog/close-normal &&
-make tests/userprog/close-twice &&
-make tests/userprog/close-bad-fd &&
-
-make tests/userprog/read-normal &&
-make tests/userprog/read-bad-ptr &&
-make tests/userprog/read-boundary &&
-make tests/userprog/read-zero &&
-make tests/userprog/read-stdout &&
-make tests/userprog/read-bad-fd &&
-
-make tests/userprog/write-normal &&
-make tests/userprog/write-bad-ptr &&
-make tests/userprog/write-boundary &&
-make tests/userprog/write-zero &&
-make tests/userprog/write-stdin &&
-make tests/userprog/write-bad-fd &&
-
-make tests/userprog/fork-once &&
-make tests/userprog/fork-multiple &&
-make tests/userprog/fork-recursive &&
-make tests/userprog/fork-read &&
-make tests/userprog/fork-close &&
-make tests/userprog/fork-boundary &&
-
-make tests/userprog/exec-once &&
-make tests/userprog/exec-arg &&
-make tests/userprog/exec-boundary &&
-make tests/userprog/exec-missing &&
-make tests/userprog/exec-bad-ptr &&
-make tests/userprog/exec-read &&
-
-make tests/userprog/wait-simple &&
-make tests/userprog/wait-twice &&
-make tests/userprog/wait-killed &&
-make tests/userprog/wait-bad-pid &&
-
-make tests/userprog/multi-recurse &&
-make tests/userprog/multi-child-fd &&
-
-make tests/userprog/rox-simple &&
-make tests/userprog/rox-child &&
-make tests/userprog/rox-multichild &&
-
-make tests/userprog/bad-read &&
-make tests/userprog/bad-write &&
-make tests/userprog/bad-read2 &&
-make tests/userprog/bad-write2 &&
-make tests/userprog/bad-jump &&
-make tests/userprog/bad-jump2 &&
+/* all */
+make tests/userprog/args-none.result && make tests/userprog/args-single.result && make tests/userprog/args-multiple.result && make tests/userprog/args-many.result && make tests/userprog/args-dbl-space.result && make tests/userprog/halt.result && make tests/userprog/exit.result && make tests/userprog/create-normal.result && make tests/userprog/create-empty.result && make tests/userprog/create-null.result && make tests/userprog/create-bad-ptr.result && make tests/userprog/create-long.result && make tests/userprog/create-exists.result && make tests/userprog/create-bound.result && make tests/userprog/open-normal.result && make tests/userprog/open-missing.result && make tests/userprog/open-boundary.result && make tests/userprog/open-empty.result && make tests/userprog/open-null.result && make tests/userprog/open-bad-ptr.result && make tests/userprog/open-twice.result && make tests/userprog/close-normal.result && make tests/userprog/close-twice.result && make tests/userprog/close-bad-fd.result && make tests/userprog/read-normal.result && make tests/userprog/read-bad-ptr.result && make tests/userprog/read-boundary.result && make tests/userprog/read-zero.result && make tests/userprog/read-stdout.result && make tests/userprog/read-bad-fd.result && make tests/userprog/write-normal.result && make tests/userprog/write-bad-ptr.result && make tests/userprog/write-boundary.result && make tests/userprog/write-zero.result && make tests/userprog/write-stdin.result && make tests/userprog/write-bad-fd.result && make tests/userprog/fork-once.result && make tests/userprog/fork-multiple.result && make tests/userprog/fork-recursive.result && make tests/userprog/fork-read.result && make tests/userprog/fork-close.result && make tests/userprog/fork-boundary.result && make tests/userprog/exec-once.result && make tests/userprog/exec-arg.result && make tests/userprog/exec-boundary.result && make tests/userprog/exec-missing.result && make tests/userprog/exec-bad-ptr.result && make tests/userprog/exec-read.result && make tests/userprog/wait-simple.result && make tests/userprog/wait-twice.result && make tests/userprog/wait-killed.result && make tests/userprog/wait-bad-pid.result && make tests/userprog/multi-recurse.result && make tests/userprog/multi-child-fd.result && make tests/userprog/rox-simple.result && make tests/userprog/rox-child.result && make tests/userprog/rox-multichild.result && make tests/userprog/bad-read.result && make tests/userprog/bad-write.result && make tests/userprog/bad-read2.result && make tests/userprog/bad-write2.result && make tests/userprog/bad-jump.result && make tests/userprog/bad-jump2.result
