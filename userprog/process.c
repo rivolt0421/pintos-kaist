@@ -27,7 +27,7 @@
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
-static void __do_fork (void *);
+static void __do_fork (void **);
 
 /* General process initializer for initd and other process. */
 static void
@@ -98,9 +98,16 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
+	struct semaphore duplicate_done;
+	uintptr_t args[3] = { thread_current(), if_, &duplicate_done };
 	tid_t tid;
-	tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
-	/* Implement here */
+	
+	sema_init(&duplicate_done, 0);
+	tid = thread_create (name, PRI_DEFAULT, __do_fork, &args);
+
+	/* Wait until child completes duplication. */
+	sema_down (&duplicate_done);
+
 	return tid;
 }
 
@@ -116,21 +123,27 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if (is_kern_pte(pte))
+		return true;
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	newpage = palloc_get_page(PAL_USER);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	memcpy(newpage, parent_page, sizeof(PGSIZE));
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		return false;
 	}
 	return true;
 }
@@ -142,25 +155,25 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static bool
 duplicate_thread(struct thread *current, struct thread *parent) {
 
-	current->tid = parent->tid;
-	current->status = parent->status;
-	current->priority = parent->priority;
-	memcpy(&current->elem, &parent->elem, sizeof (struct list_elem));
-	current->time_to_wake_up = parent->time_to_wake_up;
-	current->original_priority = parent->original_priority;
-	memcpy(&current->wanted, &parent->wanted, sizeof (struct lock));
-	memcpy(&current->donor_list, &parent->donor_list, sizeof (struct list));
-	memcpy(&current->elem_d_luffy, &parent->elem_d_luffy, sizeof (struct list_elem));
+	// current->tid = parent->tid;
+	// current->status = parent->status;
+	// current->priority = parent->priority;
+	// memcpy(&current->elem, &parent->elem, sizeof (struct list_elem));
+	// current->time_to_wake_up = parent->time_to_wake_up;
+	// current->original_priority = parent->original_priority;
+	// memcpy(&current->wanted, &parent->wanted, sizeof (struct lock));
+	// memcpy(&current->donor_list, &parent->donor_list, sizeof (struct list));
+	// memcpy(&current->elem_d_luffy, &parent->elem_d_luffy, sizeof (struct list_elem));
 
 #ifdef USERPROG
-	current->exit_code = parent->exit_code;
+	// current->exit_code = parent->exit_code;
 
 	/* Duplicate files in fd_table. */
 	int i;
-	for (i=2; i<=16; i++) {
-		if (fd_table[i] == NULL)
+	for (i=2; i<=15; i++) {
+		if (parent->fd_table[i] == NULL)
 			continue;
-		current->fd_table[i] = file_duplicate(parent->fd_table[i])
+		current->fd_table[i] = file_duplicate(parent->fd_table[i]);
 	}
 	current->fd_count = parent->fd_count;
 #endif
@@ -170,7 +183,7 @@ duplicate_thread(struct thread *current, struct thread *parent) {
 	/* What's AFTER LIKE? */
 #endif
 
-	current->magic = parent->magic;
+	// current->magic = parent->magic;
 }
 
 
@@ -179,12 +192,13 @@ duplicate_thread(struct thread *current, struct thread *parent) {
  *       That is, you are required to pass second argument of process_fork to
  *       this function. */
 static void
-__do_fork (void *aux) {
+__do_fork (void **aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
+	struct thread *parent = (struct thread *) aux[0];
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = (struct intr_frame *) aux[1];
+	struct semaphore *duplicate_done = (struct semaphore *) aux[2];
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -219,6 +233,7 @@ __do_fork (void *aux) {
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
+		sema_up(duplicate_done);
 		do_iret (&if_);
 error:
 	thread_exit ();
