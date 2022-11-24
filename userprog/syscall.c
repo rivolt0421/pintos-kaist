@@ -98,7 +98,7 @@ void exit_syscall_handler (struct intr_frame *f) {
  * fork (const char *thread_name)
  */
 void fork_syscall_handler (struct intr_frame *f) {
-
+	f->R.rax = process_fork(f->R.rdi, f);
 } 
 
 /*

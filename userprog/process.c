@@ -95,8 +95,10 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	tid_t tid;
+	tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
+	/* Implement here */
+	return tid;
 }
 
 #ifndef VM
@@ -130,6 +132,44 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	return true;
 }
 #endif
+
+/* Duplicate the parent's thread to current.
+ * Some of members should not be duplicated here (i.e. pml4, tf ...).
+ * Note : I'm not sure that this code should have wrapped by `#ifndef VM`. */
+static bool
+duplicate_thread(struct thread *current, struct thread *parent) {
+
+	current->tid = parent->tid;
+	current->status = parent->status;
+	current->priority = parent->priority;
+	memcpy(&current->elem, &parent->elem, sizeof (struct list_elem));
+	current->time_to_wake_up = parent->time_to_wake_up;
+	current->original_priority = parent->original_priority;
+	memcpy(&current->wanted, &parent->wanted, sizeof (struct lock));
+	memcpy(&current->donor_list, &parent->donor_list, sizeof (struct list));
+	memcpy(&current->elem_d_luffy, &parent->elem_d_luffy, sizeof (struct list_elem));
+
+#ifdef USERPROG
+	current->exit_code = parent->exit_code;
+
+	/* Duplicate files in fd_table. */
+	int i;
+	for (i=2; i<=16; i++) {
+		if (fd_table[i] == NULL)
+			continue;
+		current->fd_table[i] = file_duplicate(parent->fd_table[i])
+	}
+	current->fd_count = parent->fd_count;
+#endif
+
+#ifdef VM
+	/* Implement maybe AFTER Project 3 */
+	/* What's AFTER LIKE? */
+#endif
+
+	current->magic = parent->magic;
+}
+
 
 /* A thread function that copies parent's execution context.
  * Hint) parent->tf does not hold the userland context of the process.
@@ -167,6 +207,10 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	
+	/* 3. Duplicate thread. (with files) */
+	duplicate_thread (current, parent);
+
 
 	process_init ();
 
