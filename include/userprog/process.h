@@ -10,4 +10,10 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
 
+// /* One executable in a list. */
+// struct exec_elem {
+// 	struct list_elem elem;      /* List element. */
+// 	uintptr_t exec;             /* file struct address for running executable */
+// };
+
 #endif /* userprog/process.h */

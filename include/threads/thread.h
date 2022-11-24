@@ -111,6 +111,10 @@ struct thread {
 	/* File descriptor table. */
 	intptr_t fd_table[16];
 	char fd_count;
+
+	/* for deny on write on executables. */
+	intptr_t running_executable;	// file struct address of executable file for this process
+
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
