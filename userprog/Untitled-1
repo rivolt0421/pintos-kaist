@@ -1,0 +1,82 @@
+
+make tests/userprog/read-normal.result && make tests/userprog/read-bad-ptr.result && make tests/userprog/read-boundary.result && make tests/userprog/read-zero.result && make tests/userprog/read-stdout.result && make tests/userprog/read-bad-fd.result
+
+make tests/userprog/write-normal.result && make tests/userprog/write-bad-ptr.result && make tests/userprog/write-boundary.result && make tests/userprog/write-zero.result && make tests/userprog/write-stdin.result && make tests/userprog/write-bad-fd.result
+
+
+
+make tests/userprog/args-none &&
+make tests/userprog/args-single &&
+make tests/userprog/args-multiple &&
+make tests/userprog/args-many &&
+make tests/userprog/args-dbl-space &&
+
+make tests/userprog/halt &&
+make tests/userprog/exit &&
+
+make tests/userprog/create-normal &&
+make tests/userprog/create-empty &&
+make tests/userprog/create-null &&
+make tests/userprog/create-bad-ptr &&
+make tests/userprog/create-long &&
+make tests/userprog/create-exists &&
+make tests/userprog/create-bound &&
+
+make tests/userprog/open-normal &&
+make tests/userprog/open-missing &&
+make tests/userprog/open-boundary &&
+make tests/userprog/open-empty &&
+make tests/userprog/open-null &&
+make tests/userprog/open-bad-ptr &&
+make tests/userprog/open-twice &&
+
+make tests/userprog/close-normal &&
+make tests/userprog/close-twice &&
+make tests/userprog/close-bad-fd &&
+
+make tests/userprog/read-normal &&
+make tests/userprog/read-bad-ptr &&
+make tests/userprog/read-boundary &&
+make tests/userprog/read-zero &&
+make tests/userprog/read-stdout &&
+make tests/userprog/read-bad-fd &&
+
+make tests/userprog/write-normal &&
+make tests/userprog/write-bad-ptr &&
+make tests/userprog/write-boundary &&
+make tests/userprog/write-zero &&
+make tests/userprog/write-stdin &&
+make tests/userprog/write-bad-fd &&
+
+make tests/userprog/fork-once &&
+make tests/userprog/fork-multiple &&
+make tests/userprog/fork-recursive &&
+make tests/userprog/fork-read &&
+make tests/userprog/fork-close &&
+make tests/userprog/fork-boundary &&
+
+make tests/userprog/exec-once &&
+make tests/userprog/exec-arg &&
+make tests/userprog/exec-boundary &&
+make tests/userprog/exec-missing &&
+make tests/userprog/exec-bad-ptr &&
+make tests/userprog/exec-read &&
+
+make tests/userprog/wait-simple &&
+make tests/userprog/wait-twice &&
+make tests/userprog/wait-killed &&
+make tests/userprog/wait-bad-pid &&
+
+make tests/userprog/multi-recurse &&
+make tests/userprog/multi-child-fd &&
+
+make tests/userprog/rox-simple &&
+make tests/userprog/rox-child &&
+make tests/userprog/rox-multichild &&
+
+make tests/userprog/bad-read &&
+make tests/userprog/bad-write &&
+make tests/userprog/bad-read2 &&
+make tests/userprog/bad-write2 &&
+make tests/userprog/bad-jump &&
+make tests/userprog/bad-jump2 &&

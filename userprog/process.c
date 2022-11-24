@@ -41,6 +41,9 @@ process_init (void) {
 		fd_table[i++] = 0;
 	}
 	current->fd_count = 2;	// 0 (STDIN_FILENO), 1 (STDOUT_FILENO)
+
+	/* initialize for deny write on executables */
+	current->running_executable = 0;
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -251,6 +254,9 @@ static void
 process_cleanup (void) {
 	struct thread *curr = thread_current ();
 
+	/* close executable file for this process */
+	file_close(curr->running_executable);
+
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
 #endif
@@ -459,12 +465,18 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
 
-	// hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
-	
+	/* deny write on loaded excutable */
+	file_deny_write(file);
+	if (t->running_executable) {			// if process already has running executable,
+		file_close(t->running_executable); 	// then close it
+	}
+	t->running_executable = file;			// remember this file(excutable).
+											// this file(excutable) will be closed when process exits.
 	return success;
 }
+
+
 
 /*
 	예시 : args-many   1 2 3 4 5 6 7

@@ -231,7 +231,7 @@ void read_syscall_handler (struct intr_frame *f) {
 	}
 	else {
 		/* fd validity check */
-		if (fd < 0 || fd > 15 || fd_table[fd] == NULL) {
+		if (fd < 2 || fd > 15 || fd_table[fd] == NULL) {
 			f->R.rax = -1;
 			return;
 		}
@@ -261,7 +261,7 @@ void write_syscall_handler (struct intr_frame *f) {
 	}
 	else {
 		/* fd validity check */
-		if (fd < 0 || fd > 15 || fd_table[fd] == NULL) {
+		if (fd < 2 || fd > 15 || fd_table[fd] == NULL) {
 			f->R.rax = -1;
 			return;
 		}
@@ -277,15 +277,42 @@ void write_syscall_handler (struct intr_frame *f) {
  * seek (int fd, unsigned position)
  */
 void seek_syscall_handler (struct intr_frame *f) {
+	int fd = f->R.rdi;
+	uintptr_t *fd_table = thread_current()->fd_table;
+	unsigned new_pos = f->R.rsi;
 
-} 
+	/* fd validity check */
+	if (fd < 2 || fd > 15 || fd_table[fd] == NULL)
+		
+	/* new position validity check */
+	if (new_pos < 0)
+		return;
+	
+	lock_acquire(&filesys_lock);
+	file_seek(fd_table[fd], new_pos);
+	lock_release(&filesys_lock);
+}
 
 /* 
  * unsigned
  * tell (int fd)
  */
 void tell_syscall_handler (struct intr_frame *f) {
+	int fd = f->R.rdi;
+	uintptr_t *fd_table = thread_current()->fd_table;
+	unsigned position = 0;
 
+	/* fd validity check */
+	if (fd < 2 || fd > 15 || fd_table[fd] == NULL) {
+		f->R.rax = -1;
+		return;
+	}
+
+	lock_acquire(&filesys_lock);
+	position = file_tell(fd_table[fd]);
+	lock_release(&filesys_lock);
+
+	f->R.rax = position;
 } 
 
 /* 
