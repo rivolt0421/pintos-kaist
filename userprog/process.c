@@ -26,7 +26,7 @@
 
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
-static void initd (void *f_name);
+static void initd (void **args);
 static void __do_fork (void **);
 
 /* General process initializer for initd and other process. */
@@ -44,6 +44,10 @@ process_init (void) {
 
 	/* initialize for deny write on executables */
 	current->running_executable = 0;  // NULL
+
+	/* initialize parent-child relationship */
+	current->sorry_mama = 0;  // NULL
+	list_init(&current->child_list);
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -68,7 +72,11 @@ process_create_initd (const char *file_name) {
 		*ptr = '\0';
 	}
 
-	tid = thread_create (file_name, PRI_DEFAULT+1, initd, fn_copy);
+	struct semaphore first_userprog_started;
+	sema_init(&first_userprog_started, 0);
+	uintptr_t args[3] = { fn_copy, thread_current(), &first_userprog_started };
+
+	tid = thread_create (file_name, PRI_DEFAULT+1, initd, args);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 
@@ -76,17 +84,36 @@ process_create_initd (const char *file_name) {
 		*ptr = ' ';
 	}
 	
+	sema_down(&first_userprog_started);
+	
 	return tid;
 }
 
 /* A thread function that launches first user process. */
 static void
-initd (void *f_name) {
+initd (void **args) {
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 
 	process_init ();
+
+	/* make parent-child relationship with initial_thread */
+	struct thread *current = thread_current();
+	char *f_name = args[0];
+	struct thread *main_thread = args[1];
+	struct semaphore *first_userprog_started = args[2];
+
+	list_init(&main_thread->child_list);
+
+	struct child *child = malloc(sizeof(struct child));
+	current->sorry_mama = child;
+
+	child->self_thread = current;
+	child->tid = current->tid;
+	sema_init(&child->sema, 0);
+	list_push_back(&main_thread->child_list, &child->elem);
+	sema_up(first_userprog_started);
 
 	if (process_exec (f_name) < 0)
 		PANIC("Fail to launch initd\n");
@@ -105,8 +132,9 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	sema_init(&duplicate_done, 0);
 	tid = thread_create (name, PRI_DEFAULT+1, __do_fork, args);
 
-	/* Wait until child completes duplication. */
-	sema_down (&duplicate_done);
+	if (tid != TID_ERROR)
+		/* Wait until child completes duplication. */
+		sema_down (&duplicate_done);
 
 	return tid;
 }
@@ -218,13 +246,24 @@ __do_fork (void **aux) {
 	/* 3. Duplicate thread. (with files) */
 	duplicate_thread (current, parent);  //fd_table, running_executable
 
+	/* 4. set parent-child relationship */
+	struct child *child = malloc(sizeof(struct child));
+	current->sorry_mama = child;
+
+	child->self_thread = thread_current();
+	child->tid = thread_current()->tid;
+	sema_init(&child->sema, 0);
+	list_push_back(&parent->child_list, &child->elem);
+	
 	/* Finally, switch to the newly created process. */
-	sema_up(duplicate_done);
+	sema_up(duplicate_done);	// waking up parent
 	if_.R.rax = 0;	// child receives 0 for return of fork()
 	do_iret (&if_);
 
 error:
-
+	/* fail to fork -> not push to child list of parent */
+	sema_up(duplicate_done);	// waking up parent
+	process_cleanup ();
 	thread_exit ();
 }
 
@@ -278,8 +317,18 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	struct list *child_list = &thread_current()->child_list;
 
-	timer_sleep(200);
+	if (child_tid > 0) {	// if valid tid,
+		struct child *child = find_child(child_list, child_tid);
+		if (child != NULL) {
+			sema_down(&child->sema);
+			char exit_code = child->exit_code;
+			list_remove(&child->elem);
+			free(child);
+			return exit_code;
+		}
+	}
 	return -1;
 }
 
@@ -287,6 +336,7 @@ process_wait (tid_t child_tid UNUSED) {
 void
 process_exit (void) {
 	struct thread *curr = thread_current ();
+	enum intr_level old_level;
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
@@ -294,6 +344,29 @@ process_exit (void) {
 	if (curr->pml4 != NULL){
 		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
 	}
+
+	/* parent-child relationship */
+	old_level = intr_disable ();
+	/* sorry mama... */
+	if(curr->sorry_mama != NULL){
+		curr->sorry_mama->exit_code = curr->exit_code;
+		sema_up(&curr->sorry_mama->sema);
+	}
+
+	/* 얌전히 있으면... 엄마가 금방 돌아올게...! 꼭..! */
+	struct list *child_list = &curr->child_list;
+	struct list_elem *e = list_head(child_list);
+
+	while (!list_empty(child_list)) {
+		struct list_elem *e = list_pop_front (child_list);
+		struct child *child = list_entry(e, struct child, elem);
+		if (child->sema.value == 0)		// child is still alive
+			child->self_thread->sorry_mama = NULL;
+		free(child);
+	}
+
+	intr_set_level (old_level);
+
 	process_cleanup ();
 }
 

@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -109,11 +110,15 @@ struct thread {
 	char exit_code;
 
 	/* File descriptor table. */
-	intptr_t fd_table[16];
+	uintptr_t fd_table[16];
 	char fd_count;
 
 	/* for deny on write on executables. */
-	intptr_t running_executable;	// file struct address of executable file for this process
+	uintptr_t running_executable;	// file struct address of executable file for this process
+
+	/* parent-child relationship */
+	struct child *sorry_mama;			// struct child of this process
+	struct list child_list;			// list of this process's children.
 
 #endif
 #ifdef VM

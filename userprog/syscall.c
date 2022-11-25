@@ -1,4 +1,5 @@
 #include "userprog/syscall.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
@@ -12,6 +13,7 @@
 #include "filesys/file.h"
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
+#include "threads/malloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -76,6 +78,19 @@ void assert_valid_address(void * uaddr) {
 	}
 }
 
+struct child *find_child (struct list *child_list, int tid) {
+	struct list_elem *e = list_head(child_list);
+
+	while ((e = list_next(e)) != list_end(child_list)) {
+		struct child *child = list_entry(e, struct child, elem);
+		if (tid == child->tid) {
+			return child;
+		}
+	}
+
+	return NULL;
+}
+
 /*
  * void
  * halt (void)
@@ -98,7 +113,20 @@ void exit_syscall_handler (struct intr_frame *f) {
  * fork (const char *thread_name)
  */
 void fork_syscall_handler (struct intr_frame *f) {
-	f->R.rax = process_fork(f->R.rdi, f);
+	struct thread *curr = thread_current();
+	struct list *child_list = &curr->child_list;
+	int tid = process_fork(f->R.rdi, f);
+
+	if (tid > 0) {	// if valid tid,
+		struct child *child = find_child(child_list, tid);
+		if (child != NULL) {
+			f->R.rax = tid;
+			return;
+		}
+	}
+
+	/* including thread_create() fail, do_fork() fail */
+	f->R.rax = TID_ERROR;
 } 
 
 /*
@@ -114,7 +142,9 @@ void exec_syscall_handler (struct intr_frame *f) {
  * wait (pid_t pid)
  */
 void wait_syscall_handler (struct intr_frame *f) {
+	int tid = f->R.rdi;
 
+	f->R.rax = process_wait(tid);
 } 
 
 /*
