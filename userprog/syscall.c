@@ -209,7 +209,7 @@ void open_syscall_handler (struct intr_frame *f) {
 	uintptr_t *file_opened;
 
 	/* check file_name and fd_count */
-	if (!file_name || thread_current()->fd_count >= 16) {
+	if (!file_name || thread_current()->fd_count >= FD_MAX) {
 		f->R.rax = -1;
 		return;
 	}
@@ -224,7 +224,7 @@ void open_syscall_handler (struct intr_frame *f) {
 	}
 	
 	/* find empty entry */
-	for (char idx = 2; idx < 16; idx++) {
+	for (char idx = 2; idx < FD_MAX; idx++) {
 		if (!fd_table[idx]) {	// 2번부터 빈 공간 선형 탐색
 			fd_table[idx] = file_opened;
 			f->R.rax = idx;		// 유저에게 fd를 넘겨주는 순간
@@ -246,7 +246,7 @@ void filesize_syscall_handler (struct intr_frame *f) {
 	intptr_t *fd_table = thread_current()->fd_table;
 
 	/* fd validity check */
-	if (fd < 2 || fd > 15 || fd_table[fd] == NULL) {
+	if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL) {
 		f->R.rax = -1;
 		return;
 	}
@@ -280,7 +280,7 @@ void read_syscall_handler (struct intr_frame *f) {
 	}
 	else {
 		/* fd validity check */
-		if (fd < 2 || fd > 15 || fd_table[fd] == NULL) {
+		if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL) {
 			f->R.rax = -1;
 			return;
 		}
@@ -310,7 +310,7 @@ void write_syscall_handler (struct intr_frame *f) {
 	}
 	else {
 		/* fd validity check */
-		if (fd < 2 || fd > 15 || fd_table[fd] == NULL) {
+		if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL) {
 			f->R.rax = -1;
 			return;
 		}
@@ -331,7 +331,7 @@ void seek_syscall_handler (struct intr_frame *f) {
 	unsigned new_pos = f->R.rsi;
 
 	/* fd validity check */
-	if (fd < 2 || fd > 15 || fd_table[fd] == NULL)
+	if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL)
 		
 	/* new position validity check */
 	if (new_pos < 0)
@@ -352,7 +352,7 @@ void tell_syscall_handler (struct intr_frame *f) {
 	unsigned position = 0;
 
 	/* fd validity check */
-	if (fd < 2 || fd > 15 || fd_table[fd] == NULL) {
+	if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL) {
 		f->R.rax = -1;
 		return;
 	}
@@ -373,7 +373,7 @@ void close_syscall_handler (struct intr_frame *f) {
 	uintptr_t *fd_table = thread_current()->fd_table;
 
 	/* fd validity check */
-	if (fd < 2 || fd > 15 || fd_table[fd] == NULL)
+	if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL)
 		return;	// silently fail...
 
 	lock_acquire(&filesys_lock);

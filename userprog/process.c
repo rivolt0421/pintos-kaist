@@ -37,7 +37,7 @@ process_init (void) {
 	/* initialize fd_table */
 	intptr_t *fd_table = current->fd_table;
 	char i = 0;
-	while(i < 16) {	// 0 ~ 15 (16개)
+	while(i < FD_MAX) {	// 0 ~ FD_MAX (FD_MAX개)
 		fd_table[i++] = 0;
 	}
 	current->fd_count = 2;	// 0 (STDIN_FILENO), 1 (STDOUT_FILENO)
@@ -189,7 +189,7 @@ duplicate_thread(struct thread *current, struct thread *parent) {
 #else
 	/* Duplicate files in fd_table. */
 	int i;
-	for (i=0; i<16; i++) {
+	for (i = 0; i < FD_MAX; i++) {
 		if (parent->fd_table[i] == NULL)
 			continue;
 		current->fd_table[i] = file_duplicate(parent->fd_table[i]);
@@ -197,7 +197,8 @@ duplicate_thread(struct thread *current, struct thread *parent) {
 	current->fd_count = parent->fd_count;
 
 	/* Duplicate running_executable file */
-	current->running_executable = file_duplicate(parent->running_executable);
+	// current->running_executable = file_duplicate(parent->running_executable);
+	// current->running_executable = 0;
 	
 #endif
 
@@ -341,7 +342,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	
+
 	if (curr->pml4 != NULL){
 		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
 

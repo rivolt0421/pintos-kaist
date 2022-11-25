@@ -28,6 +28,9 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+/* for fd_table */
+#define FD_MAX 16
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -110,7 +113,7 @@ struct thread {
 	char exit_code;
 
 	/* File descriptor table. */
-	uintptr_t fd_table[16];
+	uintptr_t fd_table[FD_MAX];
 	char fd_count;
 
 	/* for deny on write on executables. */
