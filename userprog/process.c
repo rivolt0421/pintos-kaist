@@ -43,7 +43,7 @@ process_init (void) {
 	current->fd_count = 2;	// 0 (STDIN_FILENO), 1 (STDOUT_FILENO)
 
 	/* initialize for deny write on executables */
-	current->running_executable = 0;
+	current->running_executable = 0;  // NULL
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -103,7 +103,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	tid_t tid;
 	
 	sema_init(&duplicate_done, 0);
-	tid = thread_create (name, PRI_DEFAULT, __do_fork, &args);
+	tid = thread_create (name, PRI_DEFAULT+1, __do_fork, args);
 
 	/* Wait until child completes duplication. */
 	sema_down (&duplicate_done);
@@ -131,12 +131,12 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-	newpage = palloc_get_page(PAL_USER);
+	newpage = palloc_get_page(PAL_USER | PAL_ZERO);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
-	memcpy(newpage, parent_page, sizeof(PGSIZE));
+	memcpy(newpage, parent_page, PGSIZE);
 	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
@@ -155,35 +155,24 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static bool
 duplicate_thread(struct thread *current, struct thread *parent) {
 
-	// current->tid = parent->tid;
-	// current->status = parent->status;
-	// current->priority = parent->priority;
-	// memcpy(&current->elem, &parent->elem, sizeof (struct list_elem));
-	// current->time_to_wake_up = parent->time_to_wake_up;
-	// current->original_priority = parent->original_priority;
-	// memcpy(&current->wanted, &parent->wanted, sizeof (struct lock));
-	// memcpy(&current->donor_list, &parent->donor_list, sizeof (struct list));
-	// memcpy(&current->elem_d_luffy, &parent->elem_d_luffy, sizeof (struct list_elem));
-
-#ifdef USERPROG
-	// current->exit_code = parent->exit_code;
-
+#ifdef VM
+	/* Implement maybe AFTER Project 3 */
+	/* What's AFTER LIKE? */
+#else
 	/* Duplicate files in fd_table. */
 	int i;
-	for (i=2; i<=15; i++) {
+	for (i=0; i<16; i++) {
 		if (parent->fd_table[i] == NULL)
 			continue;
 		current->fd_table[i] = file_duplicate(parent->fd_table[i]);
 	}
 	current->fd_count = parent->fd_count;
+
+	/* Duplicate running_executable file */
+	current->running_executable = file_duplicate(parent->running_executable);
+	
 #endif
 
-#ifdef VM
-	/* Implement maybe AFTER Project 3 */
-	/* What's AFTER LIKE? */
-#endif
-
-	// current->magic = parent->magic;
 }
 
 
@@ -193,13 +182,13 @@ duplicate_thread(struct thread *current, struct thread *parent) {
  *       this function. */
 static void
 __do_fork (void **aux) {
-	struct intr_frame if_;
+	struct intr_frame if_;	// for do_iret
 	struct thread *current = thread_current ();
 	struct thread *parent = (struct thread *) aux[0];
-	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if = (struct intr_frame *) aux[1];
 	struct semaphore *duplicate_done = (struct semaphore *) aux[2];
-	bool succ = true;
+
+	process_init();
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
@@ -210,6 +199,7 @@ __do_fork (void **aux) {
 		goto error;
 
 	process_activate (current);
+
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
@@ -226,16 +216,15 @@ __do_fork (void **aux) {
 	 * TODO:       the resources of parent.*/
 	
 	/* 3. Duplicate thread. (with files) */
-	duplicate_thread (current, parent);
-
-
-	process_init ();
+	duplicate_thread (current, parent);  //fd_table, running_executable
 
 	/* Finally, switch to the newly created process. */
-	if (succ)
-		sema_up(duplicate_done);
-		do_iret (&if_);
+	sema_up(duplicate_done);
+	if_.R.rax = 0;	// child receives 0 for return of fork()
+	do_iret (&if_);
+
 error:
+
 	thread_exit ();
 }
 
@@ -526,12 +515,11 @@ done:
 	/* We arrive here whether the load is successful or not. */
 
 	/* deny write on loaded excutable */
-	file_deny_write(file);
-	if (t->running_executable) {			// if process already has running executable,
-		file_close(t->running_executable); 	// then close it
-	}
-	t->running_executable = file;			// remember this file(excutable).
-											// this file(excutable) will be closed when process exits.
+	file_deny_write(file);					// deny.
+	if (t->running_executable)  			// if process already has running executable, (e.g. when exec() called)
+		file_close(t->running_executable); 	// then close it.
+	t->running_executable = file;			// remember this file(excutable). this file(excutable) will be closed when process exits.
+
 	return success;
 }
 
