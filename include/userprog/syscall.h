@@ -1,6 +1,8 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
+#include "userprog/process.h"
+
 struct intr_frame;
 
 /* Lock used by allocate_tid(). */

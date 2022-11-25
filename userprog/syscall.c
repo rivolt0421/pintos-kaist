@@ -14,6 +14,7 @@
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
 #include "threads/malloc.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -134,7 +135,25 @@ void fork_syscall_handler (struct intr_frame *f) {
  * exec (const char *file)
  */
 void exec_syscall_handler (struct intr_frame *f) {
+	assert_valid_address(f->R.rdi);
+	
+	char *arg, *arg_copy;
+	arg = f->R.rdi;
 
+	/* Make a copy of argument */
+	arg_copy = palloc_get_page (0);
+	if (arg_copy != NULL) {
+		strlcpy(arg_copy, arg, PGSIZE);
+
+		/* for deny on write on executables. */
+		thread_current()->running_executable = 0;
+
+		/* Never return if succeed */
+		int result = process_exec(arg_copy);
+	}
+
+	thread_current()->exit_code = -1;
+	thread_exit();
 } 
 
 /*

@@ -584,15 +584,12 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	success = true;
 
-done:
-	/* We arrive here whether the load is successful or not. */
-
 	/* deny write on loaded excutable */
 	file_deny_write(file);					// deny.
-	if (t->running_executable)  			// if process already has running executable, (e.g. when exec() called)
-		file_close(t->running_executable); 	// then close it.
 	t->running_executable = file;			// remember this file(excutable). this file(excutable) will be closed when process exits.
 
+done:
+	/* We arrive here whether the load is successful or not. */
 	return success;
 }
 
