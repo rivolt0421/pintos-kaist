@@ -136,7 +136,7 @@ void fork_syscall_handler (struct intr_frame *f) {
  */
 void exec_syscall_handler (struct intr_frame *f) {
 	assert_valid_address(f->R.rdi);
-	
+
 	char *arg, *arg_copy;
 	arg = f->R.rdi;
 
@@ -145,8 +145,8 @@ void exec_syscall_handler (struct intr_frame *f) {
 	if (arg_copy != NULL) {
 		strlcpy(arg_copy, arg, PGSIZE);
 
-		/* for deny on write on executables. */
-		thread_current()->running_executable = 0;
+		/* initialize for deny write on executables */
+		thread_current()->running_executable = 0;  // NULL
 
 		/* Never return if succeed */
 		int result = process_exec(arg_copy);

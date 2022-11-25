@@ -341,31 +341,31 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+	
 	if (curr->pml4 != NULL){
 		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
+
+		/* parent-child relationship */
+		old_level = intr_disable ();
+		/* sorry mama... */
+		if(curr->sorry_mama != NULL){
+			curr->sorry_mama->exit_code = curr->exit_code;
+			sema_up(&curr->sorry_mama->sema);
+		}
+
+		/* 얌전히 있으면... 엄마가 금방 돌아올게...! 꼭..! */
+		struct list *child_list = &curr->child_list;
+		struct list_elem *e = list_head(child_list);
+
+		while (!list_empty(child_list)) {
+			struct list_elem *e = list_pop_front (child_list);
+			struct child *child = list_entry(e, struct child, elem);
+			if (child->sema.value == 0)		// child is still alive
+				child->self_thread->sorry_mama = NULL;
+			free(child);
+		}
+		intr_set_level (old_level);
 	}
-
-	/* parent-child relationship */
-	old_level = intr_disable ();
-	/* sorry mama... */
-	if(curr->sorry_mama != NULL){
-		curr->sorry_mama->exit_code = curr->exit_code;
-		sema_up(&curr->sorry_mama->sema);
-	}
-
-	/* 얌전히 있으면... 엄마가 금방 돌아올게...! 꼭..! */
-	struct list *child_list = &curr->child_list;
-	struct list_elem *e = list_head(child_list);
-
-	while (!list_empty(child_list)) {
-		struct list_elem *e = list_pop_front (child_list);
-		struct child *child = list_entry(e, struct child, elem);
-		if (child->sema.value == 0)		// child is still alive
-			child->self_thread->sorry_mama = NULL;
-		free(child);
-	}
-
-	intr_set_level (old_level);
 
 	process_cleanup ();
 }
@@ -376,7 +376,8 @@ process_cleanup (void) {
 	struct thread *curr = thread_current ();
 
 	/* close executable file for this process */
-	file_close(curr->running_executable);
+	if (curr->running_executable)
+		file_close(curr->running_executable);
 
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
