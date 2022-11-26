@@ -208,7 +208,9 @@ lock_acquire (struct lock *lock) {
 
 		sema_down (&lock->semaphore);                   // sleep에 빠짐.
 
+		/* Got the lock. */
 		lock->holder = thread_current ();
+		thread_current()->wanted = NULL;
 	}
 }
 

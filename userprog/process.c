@@ -192,7 +192,9 @@ duplicate_thread(struct thread *current, struct thread *parent) {
 	for (i = 0; i < FD_MAX; i++) {
 		if (parent->fd_table[i] == NULL)
 			continue;
+		lock_acquire(&filesys_lock);
 		current->fd_table[i] = file_duplicate(parent->fd_table[i]);
+		lock_release(&filesys_lock);
 	}
 	current->fd_count = parent->fd_count;
 
