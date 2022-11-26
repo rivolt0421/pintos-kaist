@@ -76,7 +76,7 @@ process_create_initd (const char *file_name) {
 	sema_init(&first_userprog_started, 0);
 	uintptr_t args[3] = { fn_copy, thread_current(), &first_userprog_started };
 
-	tid = thread_create (file_name, PRI_DEFAULT+1, initd, args);
+	tid = thread_create (file_name, PRI_DEFAULT, initd, args);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 
@@ -104,6 +104,8 @@ initd (void **args) {
 	struct thread *main_thread = args[1];
 	struct semaphore *first_userprog_started = args[2];
 
+	/* main_thread does not call process_init().
+	 * Therefore, explicitly initialize child_list */
 	list_init(&main_thread->child_list);
 
 	struct child *child = malloc(sizeof(struct child));
@@ -130,7 +132,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	tid_t tid;
 	
 	sema_init(&duplicate_done, 0);
-	tid = thread_create (name, PRI_DEFAULT+1, __do_fork, args);
+	tid = thread_create (name, PRI_DEFAULT, __do_fork, args);
 
 	if (tid != TID_ERROR)
 		/* Wait until child completes duplication. */
@@ -177,11 +179,11 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 }
 #endif
 
-/* Duplicate the parent's thread to current.
+/* Duplicate the parent's open files to current.
  * Some of members should not be duplicated here (i.e. pml4, tf ...).
  * Note : I'm not sure that this code should have wrapped by `#ifndef VM`. */
 static bool
-duplicate_thread(struct thread *current, struct thread *parent) {
+duplicate_open_files(struct thread *current, struct thread *parent) {
 
 #ifdef VM
 	/* Implement maybe AFTER Project 3 */
@@ -247,7 +249,7 @@ __do_fork (void **aux) {
 	 * TODO:       the resources of parent.*/
 	
 	/* 3. Duplicate thread. (with files) */
-	duplicate_thread (current, parent);  //fd_table, running_executable
+	duplicate_open_files (current, parent);  //fd_table, running_executable
 
 	/* 4. set parent-child relationship */
 	struct child *child = malloc(sizeof(struct child));
@@ -257,16 +259,18 @@ __do_fork (void **aux) {
 	child->tid = thread_current()->tid;
 	sema_init(&child->sema, 0);
 	list_push_back(&parent->child_list, &child->elem);
+	sema_up(duplicate_done);	// waking up parent
+								// 자식이(현재 스레드가) 부모 스레드의 커널 스택에 있는 정보들을
+								// 다 이용했기 때문에, 부모가 일어나서(wake up) fork handler 함수를
+								// 반환해도 괜찮다는 의미.
 	
 	/* Finally, switch to the newly created process. */
-	sema_up(duplicate_done);	// waking up parent
 	if_.R.rax = 0;	// child receives 0 for return of fork()
 	do_iret (&if_);
 
 error:
-	/* fail to fork -> not push to child list of parent */
+	/* fail to fork -> NOT push to child list of parent */
 	sema_up(duplicate_done);	// waking up parent
-	process_cleanup ();
 	thread_exit ();
 }
 
@@ -325,8 +329,9 @@ process_wait (tid_t child_tid UNUSED) {
 	if (child_tid > 0) {	// if valid tid,
 		struct child *child = find_child(child_list, child_tid);
 		if (child != NULL) {
-			sema_down(&child->sema);
-			char exit_code = child->exit_code;
+			sema_down(&child->sema);	// waiting for child to be dead.
+
+			int exit_code = child->exit_code;
 			list_remove(&child->elem);
 			free(child);
 			return exit_code;
@@ -345,17 +350,19 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
+	// if user thread (process),
 	if (curr->pml4 != NULL){
 		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
 
-		/* parent-child relationship */
 		old_level = intr_disable ();
+		/* 부모에게 자식이(현재 프로세스가) 죽었음을 알게함 */
 		/* sorry mama... */
 		if(curr->sorry_mama != NULL){
 			curr->sorry_mama->exit_code = curr->exit_code;
 			sema_up(&curr->sorry_mama->sema);
 		}
 
+		/* 현재 프로세스의 child_list를 정리함 */
 		/* 얌전히 있으면... 엄마가 금방 돌아올게...! 꼭..! */
 		struct list *child_list = &curr->child_list;
 		struct list_elem *e = list_head(child_list);
@@ -368,6 +375,13 @@ process_exit (void) {
 			free(child);
 		}
 		intr_set_level (old_level);
+
+		/* close all open files */
+		lock_acquire(&filesys_lock);
+		for (char fd = 2; fd < FD_MAX; fd++) {
+			file_close(curr->fd_table[fd]);
+		}
+		lock_release(&filesys_lock);
 	}
 
 	process_cleanup ();
@@ -379,8 +393,9 @@ process_cleanup (void) {
 	struct thread *curr = thread_current ();
 
 	/* close executable file for this process */
-	if (curr->running_executable)
-		file_close(curr->running_executable);
+	lock_acquire(&filesys_lock);
+	file_close(curr->running_executable);
+	lock_release(&filesys_lock);
 
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
@@ -495,7 +510,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
-	// TODO : 널문자 끼워넣기 신공 ()
+	// 널문자('\0') 끼워넣기 신공
 	if((ptr = strchr((char *)file_name, ' '))){
 		*ptr = '\0';
 	}
@@ -589,8 +604,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	success = true;
 
 	/* deny write on loaded excutable */
-	file_deny_write(file);					// deny.
-	t->running_executable = file;			// remember this file(excutable). this file(excutable) will be closed when process exits.
+	file_deny_write(file);					// deny write on running executable of this process.
+	t->running_executable = file;			// remember this file(excutable).
+											// This file(excutable) will be closed in process_exit().
 
 done:
 	/* We arrive here whether the load is successful or not. */

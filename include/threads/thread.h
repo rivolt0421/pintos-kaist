@@ -110,7 +110,7 @@ struct thread {
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
-	char exit_code;
+	int exit_code;
 
 	/* File descriptor table. */
 	uintptr_t fd_table[FD_MAX];

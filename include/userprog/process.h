@@ -14,7 +14,7 @@ void process_activate (struct thread *next);
 struct child {
     struct thread *self_thread;
     tid_t tid;
-    char exit_code;
+    int exit_code;
 	struct list_elem elem;
 	struct semaphore sema;
 };
