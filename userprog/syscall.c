@@ -145,13 +145,10 @@ void exec_syscall_handler (struct intr_frame *f) {
 	if (arg_copy != NULL) {
 		strlcpy(arg_copy, arg, PGSIZE);
 
-		/* initialize for deny write on executables */
-		thread_current()->running_executable = 0;  // NULL
-
 		/* Never return if succeed */
 		int result = process_exec(arg_copy);
 	}
-
+	/* Reaches here when failure. */
 	thread_current()->exit_code = -1;
 	thread_exit();
 } 

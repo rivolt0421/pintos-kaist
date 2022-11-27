@@ -201,8 +201,7 @@ duplicate_open_files(struct thread *current, struct thread *parent) {
 	current->fd_count = parent->fd_count;
 
 	/* Duplicate running_executable file */
-	// current->running_executable = file_duplicate(parent->running_executable);
-	// current->running_executable = 0;
+	current->running_executable = file_duplicate(parent->running_executable);
 	
 #endif
 
@@ -395,6 +394,7 @@ process_cleanup (void) {
 	/* close executable file for this process */
 	lock_acquire(&filesys_lock);
 	file_close(curr->running_executable);
+	curr->running_executable = NULL;
 	lock_release(&filesys_lock);
 
 #ifdef VM
@@ -596,10 +596,10 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	 if(ptr){
+	if(ptr){
 		*ptr = ' ';
-	 }
-	 parse_argument(file_name, if_);
+	}
+	parse_argument(file_name, if_);
 
 	success = true;
 
