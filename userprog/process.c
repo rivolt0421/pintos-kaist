@@ -194,9 +194,7 @@ duplicate_open_files(struct thread *current, struct thread *parent) {
 	for (i = 0; i < FD_MAX; i++) {
 		if (parent->fd_table[i] == NULL)
 			continue;
-		lock_acquire(&filesys_lock);
 		current->fd_table[i] = file_duplicate(parent->fd_table[i]);
-		lock_release(&filesys_lock);
 	}
 	current->fd_count = parent->fd_count;
 
@@ -248,7 +246,9 @@ __do_fork (void **aux) {
 	 * TODO:       the resources of parent.*/
 	
 	/* 3. Duplicate thread. (with files) */
+	lock_acquire(&filesys_lock);
 	duplicate_open_files (current, parent);  //fd_table, running_executable
+	lock_release(&filesys_lock);
 
 	/* 4. set parent-child relationship */
 	struct child *child = malloc(sizeof(struct child));
@@ -376,6 +376,8 @@ process_exit (void) {
 		intr_set_level (old_level);
 
 		/* close all open files */
+		/* exec() 시에는 fd_table이 유지되어야 하기 때문에,
+		 * process_cleanup() 밖에 위치시킴 */
 		lock_acquire(&filesys_lock);
 		for (char fd = 2; fd < FD_MAX; fd++) {
 			file_close(curr->fd_table[fd]);
