@@ -193,10 +193,13 @@ lock_init (struct lock *lock) {
 void
 lock_acquire (struct lock *lock) {
 
+	enum intr_level old_level;
+
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	old_level = intr_disable ();
 	if (!lock_try_acquire(lock)) {
 		lock->is_hyped = true;
 		struct thread *holder = lock->holder;
@@ -210,8 +213,8 @@ lock_acquire (struct lock *lock) {
 
 		/* Got the lock. */
 		lock->holder = thread_current ();
-		thread_current()->wanted = NULL;
 	}
+	intr_set_level (old_level);
 }
 
 void
@@ -252,19 +255,24 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 	
+	enum intr_level old_level;
 	struct thread *holder = lock->holder;
 	struct list *donor_list = &holder->donor_list;
+
+	old_level = intr_disable ();
 
 	/* lock을 기다리는 하나 이상의 thread가 존재하면 donation 과정 진입 */
 	if(lock->is_hyped) {
 		struct list_elem *e = list_begin(donor_list);
 		int max_priority = holder->original_priority;
-		
+
 		/* donor_list 순회 */
 		while (e != list_end (donor_list)) {
 			struct thread *t = list_entry(e, struct thread, elem_d_luffy);
-			if (lock == t->wanted)				// t가 원하는 lock이면, 현재쓰레드는 donate의 의무를 완료한 것.
+			if (lock == t->wanted) {			// t가 원하는 lock이면, 현재쓰레드는 donate의 의무를 완료한 것.
+				t->wanted = NULL;
 				e = list_remove(e);				// 따라서 donor_list에서 지워줌.
+			}
 			else {								// t가 원하는 lock이 아니면, 아직 donate의 의무를 완료하지 못한 것.
 				if (max_priority < t->priority)	// 남은 donor 중 가장 우선순위가 높은 donor의 의무부터 완료해야 함.
 					max_priority = t->priority;
@@ -275,6 +283,8 @@ lock_release (struct lock *lock) {
 		lock->is_hyped = false;
 	}
 	lock->holder = NULL;
+	intr_set_level (old_level);
+
 	sema_up (&lock->semaphore);
 }
 
