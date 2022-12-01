@@ -495,3 +495,10 @@ bool compare (const struct list_elem *a, const struct list_elem *b, void *aux) {
 
 	return (thread_a->priority < thread_b->priority);
 }
+
+bool luffy_compare (const struct list_elem *a, const struct list_elem *b, void *aux) {
+	struct thread *thread_a = list_entry(a, struct thread, elem_d_luffy);
+	struct thread *thread_b = list_entry(b, struct thread, elem_d_luffy);
+
+	return (thread_a->priority > thread_b->priority);
+}
