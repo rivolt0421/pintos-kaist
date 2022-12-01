@@ -197,21 +197,21 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
-	if (!lock_try_acquire(lock)) {
+	struct thread *holder = lock->holder;
+
+	if (holder != NULL) {
 		lock->is_hyped = true;
-		struct thread *holder = lock->holder;
 
 		thread_current()->wanted = lock;	// wanted에 원하는 lock 명시
 		list_push_back(&(holder->donor_list), &(thread_current()->elem_d_luffy));
 		holder->priority = thread_current()->priority;	// ! donation !
 		narashi(holder, thread_current()->priority);	// for nested donation
-
-		sema_down (&lock->semaphore);                   // sleep에 빠짐.
-
-		/* Got the lock. */
-		lock->holder = thread_current ();
-		thread_current()->wanted = NULL;
 	}
+	sema_down (&lock->semaphore);                   	// sleep에 빠짐.
+
+	/* Got the lock. */
+	lock->holder = thread_current ();
+	thread_current()->wanted = NULL;
 }
 
 void
