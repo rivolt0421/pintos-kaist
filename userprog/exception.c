@@ -155,6 +155,14 @@ page_fault (struct intr_frame *f) {
 			not_present ? "not present" : "rights violation",
 			write ? "writing" : "reading",
 			user ? "user" : "kernel");
+
+	/* Terminate the process with a -1 exit code
+	   when caused by USER process. */
+	if (user) {
+		thread_current()->exit_code = -1;
+		thread_exit();
+	}
+
 	kill (f);
 }
 

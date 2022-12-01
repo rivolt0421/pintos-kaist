@@ -39,6 +39,7 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+
 /* Thread destruction requests */
 static struct list destruction_req;
 
@@ -107,7 +108,7 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
-	/* Init the globla thread context */
+	/* Init the global thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&sleep_list);
@@ -603,10 +604,10 @@ static void
 do_schedule(int status) {
 	ASSERT (intr_get_level () == INTR_OFF);
 	ASSERT (thread_current()->status == THREAD_RUNNING);
-	while (!list_empty (&destruction_req)) {
-		struct thread *victim =
+	while (!list_empty (&destruction_req)) {  // Q. 지표공간계에 어떻게 계시는거죠? 
+		struct thread *ghost =
 			list_entry (list_pop_front (&destruction_req), struct thread, elem);
-		palloc_free_page(victim);
+		palloc_free_page(ghost);  // A. 아, 싸패다. 떠남.
 	}
 	thread_current ()->status = status;
 	schedule ();
@@ -641,6 +642,7 @@ schedule (void) {
 		   schedule(). */
 		if (curr && curr->status == THREAD_DYING && curr != initial_thread) {
 			ASSERT (curr != next);
+			// 지박령이 됨.
 			list_push_back (&destruction_req, &curr->elem);
 		}
 

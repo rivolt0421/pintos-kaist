@@ -5,10 +5,10 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
-
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -27,6 +27,9 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+/* for fd_table */
+#define FD_MAX 32
 
 /* A kernel thread or user process.
  *
@@ -107,6 +110,19 @@ struct thread {
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
+	int exit_code;
+
+	/* File descriptor table. */
+	uintptr_t fd_table[FD_MAX];
+	char fd_count;
+
+	/* for deny on write on executables. */
+	uintptr_t running_executable;	// file struct address of executable file for this process
+
+	/* parent-child relationship */
+	struct child *sorry_mama;			// struct child of this process
+	struct list child_list;			// list of this process's children.
+
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
