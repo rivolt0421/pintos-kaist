@@ -197,21 +197,34 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
-	if (!lock_try_acquire(lock)) {
+	struct thread *holder = lock->holder;
+	if(lock->holder != NULL){
 		lock->is_hyped = true;
-		struct thread *holder = lock->holder;
-
-		thread_current()->wanted = lock;	// wanted에 원하는 lock 명시
-		list_push_back(&(holder->donor_list), &(thread_current()->elem_d_luffy));
+		thread_current()->wanted = lock;
+		list_insert_ordered(&(holder->donor_list), &(thread_current()->elem_d_luffy), luffy_compare, NULL);
 		holder->priority = thread_current()->priority;	// ! donation !
 		narashi(holder, thread_current()->priority);	// for nested donation
+	};
 
-		sema_down (&lock->semaphore);                   // sleep에 빠짐.
+	sema_down (&lock->semaphore);
+	/* Got the lock. */
+	lock->holder = thread_current ();
+	thread_current()->wanted = NULL;
 
-		/* Got the lock. */
-		lock->holder = thread_current ();
-		thread_current()->wanted = NULL;
-	}
+	// if (!lock_try_acquire(lock)) {
+	// 	lock->is_hyped = true;
+
+	// 	thread_current()->wanted = lock;	// wanted에 원하는 lock 명시
+	// 	list_insert_ordered(&(holder->donor_list), &(thread_current()->elem_d_luffy), luffy_compare, NULL);
+	// 	holder->priority = thread_current()->priority;	// ! donation !
+	// 	narashi(holder, thread_current()->priority);	// for nested donation
+
+	// 	sema_down (&lock->semaphore);                   // sleep에 빠짐.
+
+	// 	/* Got the lock. */
+	// 	lock->holder = thread_current ();
+	// 	thread_current()->wanted = NULL;
+	// }
 }
 
 void
@@ -252,31 +265,41 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 	
-	struct thread *holder = lock->holder;
+	lock_donor_remove(lock);
+	lock->holder = NULL;
+	sema_up (&lock->semaphore);
+}
+
+void
+lock_donor_remove (struct lock *lock) {
+	struct thread *holder = thread_current();
 	struct list *donor_list = &holder->donor_list;
 
+	holder->priority = holder->original_priority;
+
 	/* lock을 기다리는 하나 이상의 thread가 존재하면 donation 과정 진입 */
-	if(lock->is_hyped) {
+	if(!list_empty(&holder->donor_list)) {
 		struct list_elem *e = list_begin(donor_list);
-		int max_priority = holder->original_priority;
 		
-		/* donor_list 순회 */
+		/* donor_list 순회하며 의무를 완료한 donor remove */
 		while (e != list_end (donor_list)) {
 			struct thread *t = list_entry(e, struct thread, elem_d_luffy);
 			if (lock == t->wanted)				// t가 원하는 lock이면, 현재쓰레드는 donate의 의무를 완료한 것.
 				e = list_remove(e);				// 따라서 donor_list에서 지워줌.
 			else {								// t가 원하는 lock이 아니면, 아직 donate의 의무를 완료하지 못한 것.
-				if (max_priority < t->priority)	// 남은 donor 중 가장 우선순위가 높은 donor의 의무부터 완료해야 함.
-					max_priority = t->priority;
 				e = list_next(e);
 			}
 		}
-		holder->priority = max_priority;
-		lock->is_hyped = false;
+		/* 남은 donor */
+		list_sort(donor_list, luffy_compare, NULL);
+		struct thread *t = list_entry(list_begin(donor_list), struct thread, elem_d_luffy);
+		if (thread_current()->priority < t->priority)	// 남은 donor 중 가장 우선순위가 높은 donor의 의무부터 완료해야 함.
+			thread_current()->priority = t->priority;
 	}
-	lock->holder = NULL;
-	sema_up (&lock->semaphore);
 }
+
+void
+lock_
 
 
 /* Returns true if the current thread holds LOCK, false

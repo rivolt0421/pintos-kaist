@@ -162,5 +162,6 @@ struct list_elem *list_min (struct list *, list_less_func *, void *aux);
 
 /* compare */
 bool compare (const struct list_elem *, const struct list_elem *, void *aux);
+bool luffy_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 #endif /* lib/kernel/list.h */
