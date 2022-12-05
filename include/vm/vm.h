@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "list.h"
+#include "filesys/file.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -18,7 +19,7 @@ enum vm_type {
 
 	/* Auxillary bit flag marker for store information. You can add more
 	 * markers, until the value is fit in the int. */
-	VM_MARKER_0 = (1 << 3),
+	VM_STACK = (1 << 3),
 	VM_MARKER_1 = (1 << 4),
 
 	/* DO NOT EXCEED THIS VALUE. */
@@ -34,6 +35,7 @@ enum vm_type {
 
 struct page_operations;
 struct thread;
+struct file;
 
 #define VM_TYPE(type) ((type) & 7)
 
@@ -91,10 +93,12 @@ struct supplemental_page_table {
 };
 
 struct lazy_args {
+	struct file *file;
+	off_t ofs;
 	uint32_t page_read_bytes;
 	uint32_t page_zero_bytes;
 	bool writable;
-}
+};
 
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);

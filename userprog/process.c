@@ -825,6 +825,25 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	struct lazy_args *la = aux;
+
+	struct file *file = la->file;
+	off_t ofs = la->ofs;
+	size_t page_read_bytes = la->page_read_bytes;
+	size_t page_zero_bytes = la->page_zero_bytes;
+	bool writable = la->writable;
+
+	file_seek(file, ofs);
+	// read page_read_bytes
+	if (file_read (file, page->va, page_read_bytes) != (int) page_read_bytes)
+		return false;
+	// set page_zero_bytes
+	memset (page->va + page_read_bytes, 0, page_zero_bytes);
+
+	free(la);	// FREE!:lazy_args
+	page->uninit.aux = NULL;
+
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -857,10 +876,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 
-		void *lazy_args = malloc(sizeof(struct lazy_args));
-		/* TODO */
+		// MALLOC!:lazy_args
+		struct lazy_args *lazy_args = malloc(sizeof(struct lazy_args));
 		if (lazy_args == NULL)
 			return false;
+		lazy_args->file = file;
+		lazy_args->ofs = ofs;
+		lazy_args->page_read_bytes = page_read_bytes;
+		lazy_args->page_zero_bytes = page_zero_bytes;
+		lazy_args->writable = writable;
 
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
 					writable, lazy_load_segment, lazy_args)) 
@@ -870,6 +894,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+		ofs += PGSIZE;
 	}
 	return true;
 }
@@ -880,11 +905,22 @@ setup_stack (struct intr_frame *if_) {
 	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
-	/* TODO: Map the stack on stack_bottom and claim the page immediately.
-	 * TODO: If success, set the rsp accordingly.
-	 * TODO: You should mark the page is stack. */
+	/* TODO: Map the stack on stack_bottom and claim the page immediately. */
+	if(!vm_alloc_page(VM_ANON | VM_STACK, stack_bottom, true))
+		return false;
+	vm_do_claim_page()
+	/* TODO: If success, set the rsp accordingly. */
+	/* TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
 
+	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+	if (kpage != NULL) {
+		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
+		if (success)
+			if_->rsp = USER_STACK;
+		else
+			palloc_free_page (kpage);
+	}
 	return success;
 }
 #endif /* VM */

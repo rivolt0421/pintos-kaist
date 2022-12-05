@@ -123,6 +123,26 @@ page_fault (struct intr_frame *f) {
 	bool user;         /* True: access by user, false: access by kernel. */
 	void *fault_addr;  /* Fault address. */
 
+	/*
+	 * not_present / 'write' / user
+	 *
+	 * not present / read / user
+	 *
+	 * not_present / write / kernel	@
+	 *
+	 * not present / read / kernel	@
+	 * 
+	 * 
+	 * present / write / user		-> include try to write read-only page
+	 *
+	 * present / write / kernel	@
+	 *
+	 * present / read / user		-> include access to kernel address from user
+	 *
+	 * present / read / kernel @
+	 *
+	 *
+	*/
 	/* Obtain faulting address, the virtual address that was
 	   accessed to cause the fault.  It may point to code or to
 	   data.  It is not necessarily the address of the instruction
@@ -133,7 +153,6 @@ page_fault (struct intr_frame *f) {
 	/* Turn interrupts back on (they were only off so that we could
 	   be assured of reading CR2 before it changed). */
 	intr_enable ();
-
 
 	/* Determine cause. */
 	not_present = (f->error_code & PF_P) == 0;

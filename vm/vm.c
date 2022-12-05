@@ -4,7 +4,8 @@
 #include "vm/vm.h"
 #include "vm/inspect.h"
 #include "threads/synch.h"
-
+#include "threads/vaddr.h"
+#include "threads/mmu.h"
 
 struct lock ft_lock;
 
@@ -29,7 +30,7 @@ vm_init (void) {
 
 	/* initialize global frame table (for users) */
 	int user_pages = get_user_pages_cnt(PAL_USER);
-	ft = malloc(sizeof(struct frame) * user_pages);
+	ft = malloc(sizeof(struct frame) * user_pages);		// MALLOC!:ft
 	ft_len = user_pages;
 	ft_pointer = undertaker = 0;
 	for (int i = 0 ; i < ft_len ; i++) {
@@ -75,16 +76,16 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 	if (spt_find_page (spt, upage) == NULL) {
 
 		/* TODO: Create the page, fetch the initializer according to the VM type, */
-		struct page *page = malloc(sizeof(struct page));
+		struct page *page = malloc(sizeof(struct page));	// MALLOC!:page
 		if (page == NULL)
 			goto err;
 
 		bool *initializer_for_type;
-		if (type == VM_ANON)
+		if (VM_TYPE(type) == VM_ANON)
 			initializer_for_type = anon_initializer;
-		else if (type == VM_FILE)
+		else if (VM_TYPE(type) == VM_FILE)
 			initializer_for_type = file_backed_initializer;
-		// else if (type == VM_PAGE_CACHE)
+		// else if (VM_TYPE(type) == VM_PAGE_CACHE)
 		// 	initializer_for_type = page_cache_initializer;
 		else
 			goto err;
@@ -167,15 +168,15 @@ vm_get_frame (void) {
 	struct frame *frame = NULL;
 
 	/* TODO: Fill this function. */
-	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);
+	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);	// MALLOC!:frame
 	if (kva == NULL)
-		PANIC ("todo");
+		PANIC ("todo : eviction");
 
 	/* update frame table */
 	lock_acquire(&ft_lock);
 
 	for (int i = 0; i < ft_len; i++) {
-		if (ft[ft_pointer].kva == NULL){ 
+		if (ft[ft_pointer].kva == NULL) { 
 			frame = &ft[ft_pointer];
 			ft_pointer++;
 			ft_pointer %= ft_len;
@@ -208,13 +209,28 @@ vm_handle_wp (struct page *page UNUSED) {
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
-	/* TODO: Validate the fault */
-	not_present = (f->error_code & PF_P) == 0;
-	write = (f->error_code & PF_W) != 0;
-	user = (f->error_code & PF_U) != 0;
+
+	/* TODO: Validate the fault 
+	 * Any invalid access terminates the process and thereby frees all of its resources.*/
+	if (!not_present || !user)	// already present. or kernel fault.
+		return false;
+	if (is_kernel_vaddr(addr))	// user try to access kernel address.
+		return false;
+
+	page = spt_find_page(spt, addr);
+	if (page == NULL)			// user should not expect any data at the address. (== cannot find page from spt list)
+		return false;
+	if (write) {
+		struct lazy_args *lazy_args = page->uninit.aux;
+		if (!lazy_args->writable)
+			return false;		// user try to write read-only page.
+	}
+
 	/* TODO: Your code goes here */
+
 
 	return vm_do_claim_page (page);
 }
@@ -224,7 +240,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 void
 vm_dealloc_page (struct page *page) {
 	destroy (page);
-	free (page);
+	free (page);	// FREE!:page
 }
 
 /* Claim the page that allocate on VA. */
@@ -241,12 +257,17 @@ vm_claim_page (void *va UNUSED) {
 static bool
 vm_do_claim_page (struct page *page) {
 	struct frame *frame = vm_get_frame ();
+	struct thread *t = thread_current();
+	struct lazy_args *la = page->uninit.aux;
 
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	ASSERT(pml4_get_page (t->pml4, page->va) == NULL);
+	if(!pml4_set_page (t->pml4, page->va, frame->kva, la->writable))
+		return false;
 
 	return swap_in (page, frame->kva);
 }

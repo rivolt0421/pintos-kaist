@@ -336,7 +336,7 @@ init_pool (struct pool *p, void **bm_base, uint64_t start, uint64_t end, uint64_
   /* We'll put the pool's used_map at its base.
      Calculate the space needed for the bitmap
      and subtract it from the pool's size. */
-	uint64_t pgcnt = (end - start) / PGSIZE;
+	uint64_t pgcnt = (end - start) / PGSIZE;	// 필요 페이지 개수 == 비트맵의 bit 개수
 	size_t bm_pages = DIV_ROUND_UP (bitmap_buf_size (pgcnt), PGSIZE) * PGSIZE;
 
 	lock_init(&p->lock);
