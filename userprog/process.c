@@ -185,10 +185,6 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static bool
 duplicate_open_files(struct thread *current, struct thread *parent) {
 
-#ifdef VM
-	/* Implement maybe AFTER Project 3 */
-	/* What's AFTER LIKE? */
-#else
 	/* Duplicate files in fd_table. */
 	int i;
 	for (i = 0; i < FD_MAX; i++) {
@@ -200,8 +196,6 @@ duplicate_open_files(struct thread *current, struct thread *parent) {
 
 	/* Duplicate running_executable file */
 	current->running_executable = file_duplicate(parent->running_executable);
-	
-#endif
 
 }
 
@@ -563,9 +557,20 @@ load (const char *file_name, struct intr_frame *if_) {
 			case PT_LOAD:
 				if (validate_segment (&phdr, file)) {
 					bool writable = (phdr.p_flags & PF_W) != 0;
+					printf("phdr.p_type: %x\n", phdr.p_type);
+					printf("phdr.p_flags: %x\n", phdr.p_flags);
+					printf("phdr.p_offset: %x\n", phdr.p_offset);	// 찐 정보가 쓰여진 offset
+					printf("phdr.p_vaddr: %x\n", phdr.p_vaddr);
+					printf("phdr.p_paddr: %x\n", phdr.p_paddr);
+					printf("phdr.p_filesz: %x\n", phdr.p_filesz);
+					printf("phdr.p_memsz: %x\n", phdr.p_memsz);
+					printf("phdr.p_align: %x\n", phdr.p_align);
 					uint64_t file_page = phdr.p_offset & ~PGMASK;
 					uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
 					uint64_t page_offset = phdr.p_vaddr & PGMASK;
+					printf("!@# file_page: %x\n", file_page);	// 세그먼트의 파일에서의 페이지 시작주소
+					printf("!@# mem_page: %x\n", mem_page);		// 가상메모리 안에서 세그먼트
+					printf("!@# page_offset: %x\n", page_offset);
 					uint32_t read_bytes, zero_bytes;
 					if (phdr.p_filesz > 0) {
 						/* Normal segment.
@@ -573,7 +578,9 @@ load (const char *file_name, struct intr_frame *if_) {
 						read_bytes = page_offset + phdr.p_filesz;
 						zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
 								- read_bytes);
-					} else {
+					}
+					else {	// bss 영역은 파일에 정보가 저장될 필요가 없다(p_filesz==0).
+							// 해당 영역 크기(p_memsz)만 알 수 있으면 된다.
 						/* Entirely zero.
 						 * Don't read anything from disk. */
 						read_bytes = 0;
@@ -849,9 +856,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
+
+		void *lazy_args = malloc(sizeof(struct lazy_args));
+		/* TODO */
+		if (lazy_args == NULL)
+			return false;
+
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+					writable, lazy_load_segment, lazy_args)) 
 			return false;
 
 		/* Advance. */

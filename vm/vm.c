@@ -3,6 +3,16 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "threads/synch.h"
+
+
+struct lock ft_lock;
+
+struct frame *ft;
+int ft_len;
+int ft_pointer;
+int undertaker;
+
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -16,6 +26,19 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+
+	/* initialize global frame table (for users) */
+	int user_pages = get_user_pages_cnt(PAL_USER);
+	ft = malloc(sizeof(struct frame) * user_pages);
+	ft_len = user_pages;
+	ft_pointer = undertaker = 0;
+	for (int i = 0 ; i < ft_len ; i++) {
+		ft[i].kva = NULL;
+		ft[i].page = NULL;
+	}
+	lock_init(&ft_lock);
+
+	printf("ft_len: %d\n", ft_len);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -50,11 +73,31 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
-		/* TODO: Create the page, fetch the initialier according to the VM type,
-		 * TODO: and then create "uninit" page struct by calling uninit_new. You
+
+		/* TODO: Create the page, fetch the initializer according to the VM type, */
+		struct page *page = malloc(sizeof(struct page));
+		if (page == NULL)
+			goto err;
+
+		bool *initializer_for_type;
+		if (type == VM_ANON)
+			initializer_for_type = anon_initializer;
+		else if (type == VM_FILE)
+			initializer_for_type = file_backed_initializer;
+		// else if (type == VM_PAGE_CACHE)
+		// 	initializer_for_type = page_cache_initializer;
+		else
+			goto err;
+
+		/* TODO: and then create "uninit" page struct by calling uninit_new. You 
 		 * TODO: should modify the field after calling the uninit_new. */
+		uninit_new(page, upage, init, type, aux, initializer_for_type);
 
 		/* TODO: Insert the page into the spt. */
+		if (!spt_insert_page(spt, page))
+			goto err;
+		
+		return true;
 	}
 err:
 	return false;
@@ -63,9 +106,17 @@ err:
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = NULL;
 	/* TODO: Fill this function. */
+	struct page *page = NULL;
+	struct list_elem *e;
 
+	for (e = list_begin (&spt->sp_list); e != list_end (&spt->sp_list); e = list_next (e)) {
+		struct page *p = list_entry(e, struct page, elem);
+		if(p->va == va) {
+			page = p;
+			break;
+		}
+	}
 	return page;
 }
 
@@ -74,7 +125,10 @@ bool
 spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	int succ = false;
+
 	/* TODO: Fill this function. */
+	list_push_front(&spt->sp_list, &page->elem);
+	succ = true;
 
 	return succ;
 }
@@ -111,9 +165,31 @@ vm_evict_frame (void) {
 static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
-	/* TODO: Fill this function. */
 
-	ASSERT (frame != NULL);
+	/* TODO: Fill this function. */
+	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);
+	if (kva == NULL)
+		PANIC ("todo");
+
+	/* update frame table */
+	lock_acquire(&ft_lock);
+
+	for (int i = 0; i < ft_len; i++) {
+		if (ft[ft_pointer].kva == NULL){ 
+			frame = &ft[ft_pointer];
+			ft_pointer++;
+			ft_pointer %= ft_len;
+			break;
+		}
+		ft_pointer++;
+		ft_pointer %= ft_len;
+	}
+	ASSERT (frame != NULL);	// should exist empty frame struct in ft if palloc returned valid pointer.
+	frame->kva = kva;
+	frame->page = NULL;
+	
+	lock_release(&ft_lock);
+	
 	ASSERT (frame->page == NULL);
 	return frame;
 }
@@ -135,6 +211,9 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
+	not_present = (f->error_code & PF_P) == 0;
+	write = (f->error_code & PF_W) != 0;
+	user = (f->error_code & PF_U) != 0;
 	/* TODO: Your code goes here */
 
 	return vm_do_claim_page (page);
@@ -153,6 +232,7 @@ bool
 vm_claim_page (void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
+	PANIC ("todo : vm_claim_page");
 
 	return vm_do_claim_page (page);
 }
@@ -174,6 +254,8 @@ vm_do_claim_page (struct page *page) {
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	list_init(&spt->sp_list);
+
 }
 
 /* Copy supplemental page table from src to dst */

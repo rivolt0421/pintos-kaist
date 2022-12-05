@@ -23,7 +23,8 @@ pgdir_walk (uint64_t *pdp, const uint64_t va, int create) {
 			} else
 				return NULL;
 		}
-		return (uint64_t *) ptov (PTE_ADDR (pdp[idx]) + 8 * PTX (va));
+		return (uint64_t *) ptov (PTE_ADDR (pdp[idx]) + 8 * PTX (va));		// PTX 는 page-table의 offset을 준다.
+																			// 각 엔트리별 8byte(64bit) 크기이므로 해당 offset에 8을 곱해준다.
 	}
 	return NULL;
 }
@@ -64,7 +65,7 @@ pdpe_walk (uint64_t *pdpe, const uint64_t va, int create) {
 uint64_t *
 pml4e_walk (uint64_t *pml4e, const uint64_t va, int create) {
 	uint64_t *pte = NULL;
-	int idx = PML4 (va);
+	int idx = PML4 (va);	// kernel virtual address 일때 idx가 1이 나온다.(user virtual address 는 0이 나오겠다.)
 	int allocated = 0;
 	if (pml4e) {
 		uint64_t *pdpe = (uint64_t *) pml4e[idx];
