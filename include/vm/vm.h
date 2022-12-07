@@ -2,6 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include "threads/synch.h"
 #include "list.h"
 #include "filesys/file.h"
 
@@ -50,6 +51,7 @@ struct page {
 
 	/* Your implementation */
 	struct list_elem elem;
+	bool writable;
 	
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -93,12 +95,18 @@ struct supplemental_page_table {
 };
 
 struct lazy_args {
-	struct file *file;
-	off_t ofs;
-	uint32_t page_read_bytes;
-	uint32_t page_zero_bytes;
-	bool writable;
+	uint64_t argc;
+	uint64_t ofs;
+	uint64_t page_read_bytes;
+	uint64_t page_zero_bytes;
 };
+
+struct lock ft_lock;
+
+struct frame *ft;
+int ft_len;
+int ft_pointer;
+int undertaker;
 
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);

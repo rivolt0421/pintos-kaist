@@ -161,7 +161,7 @@ pt_destroy (uint64_t *pt) {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++) {
 		uint64_t *pte = ptov((uint64_t *) pt[i]);
 		if (((uint64_t) pte) & PTE_P)
-			palloc_free_page ((void *) PTE_ADDR (pte));
+			palloc_free_page ((void *) PTE_ADDR (pte));		// FREE!:physical page
 	}
 	palloc_free_page ((void *) pt);
 }

@@ -294,7 +294,8 @@ thread_exit (void) {
 	ASSERT (!intr_context ());
 
 #ifdef USERPROG
-	process_exit ();
+	if (thread_current()->pml4 != NULL)
+		process_exit ();
 #endif
 
 	/* Just set our status to dying and schedule another process.

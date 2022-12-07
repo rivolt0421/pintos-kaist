@@ -11,6 +11,8 @@ enum palloc_flags {
 	PAL_USER = 004              /* User page. */
 };
 
+struct bitmap;
+
 /* Maximum number of pages to put in user pool. */
 extern size_t user_page_limit;
 

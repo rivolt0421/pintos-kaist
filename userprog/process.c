@@ -284,6 +284,7 @@ process_exec (void *f_name) {
 
 	/* We first kill the current context */
 	process_cleanup ();
+	// printf("pgcnt before load : %d\n", get_user_pages_cnt(PAL_USER));
 
 	/* And then load the binary */
 	lock_acquire(&filesys_lock);
@@ -294,7 +295,6 @@ process_exec (void *f_name) {
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
-
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -343,41 +343,40 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	// if user thread (process),
-	if (curr->pml4 != NULL){
-		printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
+	// process termination message
+	printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
 
-		old_level = intr_disable ();
-		/* 부모에게 자식이(현재 프로세스가) 죽었음을 알게함 */
-		/* sorry mama... */
-		if(curr->sorry_mama != NULL){
-			curr->sorry_mama->exit_code = curr->exit_code;
-			sema_up(&curr->sorry_mama->sema);
-		}
-
-		/* 현재 프로세스의 child_list를 정리함 */
-		/* 얌전히 있으면... 엄마가 금방 돌아올게...! 꼭..! */
-		struct list *child_list = &curr->child_list;
-		struct list_elem *e = list_head(child_list);
-
-		while (!list_empty(child_list)) {
-			struct list_elem *e = list_pop_front (child_list);
-			struct child *child = list_entry(e, struct child, elem);
-			if (child->sema.value == 0)		// child is still alive
-				child->self_thread->sorry_mama = NULL;
-			free(child);
-		}
-		intr_set_level (old_level);
-
-		/* close all open files */
-		/* exec() 시에는 fd_table이 유지되어야 하기 때문에,
-		 * process_cleanup() 밖에 위치시킴 */
-		lock_acquire(&filesys_lock);
-		for (char fd = 2; fd < FD_MAX; fd++) {
-			file_close(curr->fd_table[fd]);
-		}
-		lock_release(&filesys_lock);
+	// parent and child
+	old_level = intr_disable ();
+	/* 부모에게 자식이(현재 프로세스가) 죽었음을 알게함 */
+	/* sorry mama... */
+	if(curr->sorry_mama != NULL){
+		curr->sorry_mama->exit_code = curr->exit_code;
+		sema_up(&curr->sorry_mama->sema);
 	}
+
+	/* 현재 프로세스의 child_list를 정리함 */
+	/* 얌전히 있으면... 엄마가 금방 돌아올게...! 꼭..! */
+	struct list *child_list = &curr->child_list;
+	struct list_elem *e = list_head(child_list);
+
+	while (!list_empty(child_list)) {
+		struct list_elem *e = list_pop_front (child_list);
+		struct child *child = list_entry(e, struct child, elem);
+		if (child->sema.value == 0)		// child is still alive
+			child->self_thread->sorry_mama = NULL;
+		free(child);
+	}
+	intr_set_level (old_level);
+
+	/* close all open files */
+	/* exec() 시에는 fd_table이 유지되어야 하기 때문에,
+		* process_cleanup() 밖에 위치시킴 */
+	lock_acquire(&filesys_lock);
+	for (char fd = 2; fd < FD_MAX; fd++) {
+		file_close(curr->fd_table[fd]);
+	}
+	lock_release(&filesys_lock);
 
 	process_cleanup ();
 }
@@ -557,20 +556,20 @@ load (const char *file_name, struct intr_frame *if_) {
 			case PT_LOAD:
 				if (validate_segment (&phdr, file)) {
 					bool writable = (phdr.p_flags & PF_W) != 0;
-					printf("phdr.p_type: %x\n", phdr.p_type);
-					printf("phdr.p_flags: %x\n", phdr.p_flags);
-					printf("phdr.p_offset: %x\n", phdr.p_offset);	// 찐 정보가 쓰여진 offset
-					printf("phdr.p_vaddr: %x\n", phdr.p_vaddr);
-					printf("phdr.p_paddr: %x\n", phdr.p_paddr);
-					printf("phdr.p_filesz: %x\n", phdr.p_filesz);
-					printf("phdr.p_memsz: %x\n", phdr.p_memsz);
-					printf("phdr.p_align: %x\n", phdr.p_align);
+					// printf("phdr.p_type: %x\n", phdr.p_type);
+					// printf("phdr.p_flags: %x\n", phdr.p_flags);
+					// printf("phdr.p_offset: %x\n", phdr.p_offset);	// 찐 정보가 쓰여진 offset
+					// printf("phdr.p_vaddr: %x\n", phdr.p_vaddr);
+					// printf("phdr.p_paddr: %x\n", phdr.p_paddr);
+					// printf("phdr.p_filesz: %x\n", phdr.p_filesz);
+					// printf("phdr.p_memsz: %x\n", phdr.p_memsz);
+					// printf("phdr.p_align: %x\n", phdr.p_align);
 					uint64_t file_page = phdr.p_offset & ~PGMASK;
 					uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
 					uint64_t page_offset = phdr.p_vaddr & PGMASK;
-					printf("!@# file_page: %x\n", file_page);	// 세그먼트의 파일에서의 페이지 시작주소
-					printf("!@# mem_page: %x\n", mem_page);		// 가상메모리 안에서 세그먼트
-					printf("!@# page_offset: %x\n", page_offset);
+					// printf("!@# file_page: %x\n", file_page);	// 세그먼트의 파일에서의 페이지 시작주소
+					// printf("!@# mem_page: %x\n", mem_page);		// 가상메모리 안에서 세그먼트
+					// printf("!@# page_offset: %x\n", page_offset);
 					uint32_t read_bytes, zero_bytes;
 					if (phdr.p_filesz > 0) {
 						/* Normal segment.
@@ -827,11 +826,10 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: VA is available when calling this function. */
 	struct lazy_args *la = aux;
 
-	struct file *file = la->file;
+	struct file *file = thread_current()->running_executable;
 	off_t ofs = la->ofs;
 	size_t page_read_bytes = la->page_read_bytes;
 	size_t page_zero_bytes = la->page_zero_bytes;
-	bool writable = la->writable;
 
 	file_seek(file, ofs);
 	// read page_read_bytes
@@ -880,14 +878,13 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		struct lazy_args *lazy_args = malloc(sizeof(struct lazy_args));
 		if (lazy_args == NULL)
 			return false;
-		lazy_args->file = file;
+		lazy_args->argc = 4;
 		lazy_args->ofs = ofs;
 		lazy_args->page_read_bytes = page_read_bytes;
 		lazy_args->page_zero_bytes = page_zero_bytes;
-		lazy_args->writable = writable;
 
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, lazy_args)) 
+					writable, lazy_load_segment, lazy_args))
 			return false;
 
 		/* Advance. */
@@ -902,25 +899,17 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
 static bool
 setup_stack (struct intr_frame *if_) {
-	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately. */
-	if(!vm_alloc_page(VM_ANON | VM_STACK, stack_bottom, true))
-		return false;
-	vm_do_claim_page()
-	/* TODO: If success, set the rsp accordingly. */
 	/* TODO: You should mark the page is stack. */
-	/* TODO: Your code goes here */
 
-	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-	if (kpage != NULL) {
-		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
-		if (success)
-			if_->rsp = USER_STACK;
-		else
-			palloc_free_page (kpage);
-	}
-	return success;
+	if (!vm_alloc_page(VM_ANON | VM_STACK, stack_bottom, true))
+		return false;
+
+	/* TODO: If success, set the rsp accordingly. */
+	if_->rsp = USER_STACK;
+
+	return true;
 }
 #endif /* VM */

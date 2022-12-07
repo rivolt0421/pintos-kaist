@@ -31,7 +31,6 @@ struct pool {
 	struct lock lock;               /* Mutual exclusion. */
 	struct bitmap *used_map;        /* Bitmap of free pages. */
 	uint8_t *base;                  /* Base of pool. */
-	uint64_t initial_cnt;			/* initial count of available pages */
 };
 
 /* Two pools: one for kernel data, one for user pages. */
@@ -40,7 +39,7 @@ static struct pool kernel_pool, user_pool;
 /* Maximum number of pages to put in user pool. */
 size_t user_page_limit = SIZE_MAX;
 static void
-init_pool (struct pool *p, void **bm_base, uint64_t start, uint64_t end, uint64_t initial_cnt);
+init_pool (struct pool *p, void **bm_base, uint64_t start, uint64_t end);
 
 static bool page_from_pool (const struct pool *, void *page);
 
@@ -160,7 +159,7 @@ populate_pools (struct area *base_mem, struct area *ext_mem) {
 					}
 					// generate kernel pool
 					init_pool (&kernel_pool,
-							&free_start, region_start, start + rem * PGSIZE, kern_pages);
+							&free_start, region_start, start + rem * PGSIZE);
 					// Transition to the next state
 					if (rem == size_in_pg) {
 						rem = user_pages;
@@ -189,7 +188,7 @@ populate_pools (struct area *base_mem, struct area *ext_mem) {
 	}
 
 	// generate the user pool
-	init_pool(&user_pool, &free_start, region_start, end, user_pages);
+	init_pool(&user_pool, &free_start, region_start, end);
 
 	// Iterate over the e820_entry. Setup the usable.
 	uint64_t usable_bound = (uint64_t) free_start;
@@ -332,17 +331,17 @@ palloc_free_page (void *page) {
 
 /* Initializes pool P as starting at START and ending at END */
 static void
-init_pool (struct pool *p, void **bm_base, uint64_t start, uint64_t end, uint64_t initial_cnt) {
+init_pool (struct pool *p, void **bm_base, uint64_t start, uint64_t end) {
   /* We'll put the pool's used_map at its base.
      Calculate the space needed for the bitmap
      and subtract it from the pool's size. */
 	uint64_t pgcnt = (end - start) / PGSIZE;	// 필요 페이지 개수 == 비트맵의 bit 개수
 	size_t bm_pages = DIV_ROUND_UP (bitmap_buf_size (pgcnt), PGSIZE) * PGSIZE;
-
+	// printf("pgcnt: %d\n", pgcnt);
+	// printf("bm_pages: %d\n", bm_pages);
 	lock_init(&p->lock);
 	p->used_map = bitmap_create_in_buf (pgcnt, *bm_base, bm_pages);
 	p->base = (void *) start;
-	p->initial_cnt = initial_cnt;
 
 	// Mark all to unusable.
 	bitmap_set_all(p->used_map, true);
@@ -362,5 +361,7 @@ page_from_pool (const struct pool *pool, void *page) {
 
 int
 get_user_pages_cnt (enum palloc_flags flags) {
-	return flags & PAL_USER ? user_pool.initial_cnt : kernel_pool.initial_cnt;
+	return flags & PAL_USER ?
+		bitmap_count(user_pool.used_map, 0, bitmap_size(user_pool.used_map), false)
+	    : bitmap_count(kernel_pool.used_map, 0, bitmap_size(kernel_pool.used_map), false);
 }

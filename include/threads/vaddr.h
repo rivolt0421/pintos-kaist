@@ -25,6 +25,8 @@
 
 #define pg_no(va) ((uint64_t) (va) >> PGBITS)
 
+#define pg_start_of(va) ((uint64_t) (va) & ~PGMASK)
+
 /* Round up to nearest page boundary. */
 #define pg_round_up(va) ((void *) (((uint64_t) (va) + PGSIZE - 1) & ~PGMASK))
 
