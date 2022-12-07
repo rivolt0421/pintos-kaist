@@ -33,7 +33,6 @@ static void __do_fork (void **);
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
-
 	/* initialize fd_table */
 	intptr_t *fd_table = current->fd_table;
 	char i = 0;
@@ -48,6 +47,11 @@ process_init (void) {
 	/* initialize parent-child relationship */
 	current->sorry_mama = 0;  // NULL
 	list_init(&current->child_list);
+
+	/* initialize for stack growth */
+	current->rsp = NULL;
+	current->user_stack_bottom = USER_STACK;
+
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -228,6 +232,7 @@ __do_fork (void **aux) {
 	supplemental_page_table_init (&current->spt);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
 		goto error;
+	current->user_stack_bottom = parent->user_stack_bottom;
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
 		goto error;
@@ -394,6 +399,8 @@ process_cleanup (void) {
 
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
+	curr->rsp = NULL;
+	curr->user_stack_bottom = NULL;
 #endif
 
 	uint64_t *pml4;

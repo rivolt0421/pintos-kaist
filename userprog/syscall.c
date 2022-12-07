@@ -15,6 +15,7 @@
 #include "threads/mmu.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
+#include "vm/vm.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -51,6 +52,7 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	syscall_handler_func *handler;
+	thread_current()->rsp = f->rsp;
 
 	handler = syscall_handlers[f->R.rax];
 	if (handler) {
@@ -60,7 +62,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		intr_dump_frame (f);
 		PANIC ("Unexpected system call");
 	}
-		
+
+	thread_current()->rsp = NULL;
 }
 
 /* This assertion should be used when
@@ -75,8 +78,12 @@ void assert_valid_address(void * uaddr, bool try_to_write) {
 	 * and check writable for read() system call. (we have to write in user buffer to handle read() system call) */
 	struct page *page = spt_find_page(&thread_current()->spt, uaddr);
 
-	if (page == NULL)
+	if (page == NULL) {
+		/* check if stack growth case */
+		// later
+
 		goto terminate;
+	}
 	
 	if (try_to_write && page->writable == 0)
 		goto terminate;

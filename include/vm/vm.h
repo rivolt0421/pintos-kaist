@@ -21,7 +21,7 @@ enum vm_type {
 	/* Auxillary bit flag marker for store information. You can add more
 	 * markers, until the value is fit in the int. */
 	VM_STACK = (1 << 3),
-	VM_MARKER_1 = (1 << 4),
+	VM_IMMEDIATE = (1 << 4),
 
 	/* DO NOT EXCEED THIS VALUE. */
 	VM_MARKER_END = (1 << 31),
@@ -117,6 +117,7 @@ struct page *spt_find_page (struct supplemental_page_table *spt,
 		void *va);
 bool spt_insert_page (struct supplemental_page_table *spt, struct page *page);
 void spt_remove_page (struct supplemental_page_table *spt, struct page *page);
+void spt_print(struct supplemental_page_table *spt);
 
 void vm_init (void);
 bool vm_try_handle_fault (struct intr_frame *f, void *addr, bool user,

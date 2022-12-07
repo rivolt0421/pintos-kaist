@@ -29,7 +29,7 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 
 /* for fd_table */
-#define FD_MAX 32
+#define FD_MAX 16
 
 /* A kernel thread or user process.
  *
@@ -127,6 +127,8 @@ struct thread {
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	void *rsp;
+	void *user_stack_bottom;
 #endif
 
 	/* Owned by thread.c. */

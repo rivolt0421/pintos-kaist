@@ -95,8 +95,13 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		if (!spt_insert_page(spt, page))
 			goto err;
 
-		if (type & VM_STACK)
-			return vm_do_claim_page(page);
+		if (type & VM_STACK || type & VM_IMMEDIATE) {
+			if (!vm_do_claim_page(page))
+				goto err;
+
+			if (type & VM_STACK)
+				thread_current()->user_stack_bottom = upage;
+		}
 
 		return true;
 	}
@@ -139,11 +144,15 @@ spt_insert_page (struct supplemental_page_table *spt,
 void
 spt_print(struct supplemental_page_table *spt) {
 	printf("# spt_print\n");
+
+	struct list *sp_list = &spt->sp_list;
 	struct list_elem *e;
-	for (e = list_begin (&spt->sp_list); e != list_end (&spt->sp_list); e = list_next (e)) {
+	int cnt = 1;
+
+	for (e = list_begin (sp_list); e != list_end (sp_list); e = list_next (e)) {
 		struct page *p = list_entry(e, struct page, elem);
-		printf("p->va : %-12p  |  p->frame : %-12p  |  p->writable : %d  |  p->file : %-12p\n",
-				p->va, p->frame, p->writable, p->file);
+		printf("%3d | p->va : %-12p  |  p->frame : %-12p  |  p->writable : %d\n",
+				cnt++, p->va, p->frame, p->writable);
 	}
 }
 
@@ -210,7 +219,17 @@ vm_get_frame (void) {
 
 /* Growing the stack. */
 static void
-vm_stack_growth (void *addr UNUSED) {
+vm_stack_growth (void *addr) {
+	void *new_stack_bottom = pg_round_down(addr);
+	int page_cnt = (thread_current()->user_stack_bottom - new_stack_bottom) / PGSIZE;
+
+	while (0 < page_cnt--) {
+		if (!vm_alloc_page(VM_ANON | VM_STACK, new_stack_bottom, true))
+			PANIC("vm_stack_growth : failed");
+		
+		new_stack_bottom += PGSIZE;
+	}
+
 }
 
 /* Handle the fault on write_protected page */
@@ -225,6 +244,9 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
+	void *rsp = thread_current()->rsp;
+	void *usb = thread_current()->user_stack_bottom;
+	void *fault_addr = addr;
 
 	/* TODO: Validate the fault 
 	 * Any invalid access terminates the process and thereby frees all of its resources.*/
@@ -235,16 +257,24 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 
 	page = spt_find_page(spt, addr);	// find page in spt.
 
-	if (page == NULL)			// user should not expect any data at the address. (== cannot find page from spt list)
-		return false;
-	if (write) {
-		if (!page->writable)
-			return false;		// cannot write on read-only page.
+	if (page == NULL) {			
+		/* check if stack-growth case. */
+		if (rsp != NULL
+			&& (USER_STACK_LIMIT <= addr) && (addr < usb)
+			&& ((rsp - 8) == addr))
+		{
+			vm_stack_growth(addr);
+			return true;
+		}
+		return false;	// should not be expected to read or write any data at the address.
 	}
+	else {
+		if (write && page->writable == 0)
+			return false;			// cannot write on read-only page.
 
-	/* TODO: Your code goes here */
-
-	return vm_do_claim_page (page);
+		/* Here we can say that fault was a valid demand for page. */
+		return vm_do_claim_page (page);
+	}
 }
 
 /* Free the page.
@@ -287,7 +317,6 @@ vm_do_claim_page (struct page *page) {
 void
 supplemental_page_table_init (struct supplemental_page_table *spt) {
 	list_init(&spt->sp_list);
-
 }
 
 /* Copy supplemental page table from src to dst */
@@ -325,16 +354,12 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 		}
 		else if (operation_type == VM_ANON)
 		{
-			/* alloc */
-			if(!vm_alloc_page(type, va, writable)) // VM_STACK..??
+			/* alloc and claim(VM_IMMEDIATE)*/
+			if(!vm_alloc_page(type | VM_IMMEDIATE, va, writable))
 				return false;
-
+			
 			dst_page = spt_find_page(dst_list, va);
 			ASSERT(dst_page != NULL);
-
-			/* claim */
-			if (!vm_do_claim_page (dst_page))
-				return false;
 
 			/* memcpy */
 			memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);

@@ -152,17 +152,22 @@ page_fault (struct intr_frame *f) {
 
 	/* Turn interrupts back on (they were only off so that we could
 	   be assured of reading CR2 before it changed). */
-	intr_enable ();
+	intr_enable ();		// CAUTION!
 
 	/* Determine cause. */
 	not_present = (f->error_code & PF_P) == 0;
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
+	if (user)
+		thread_current()->rsp = f->rsp;
 
 #ifdef VM
 	/* For project 3 and later. */
-	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
+	if (vm_try_handle_fault (f, fault_addr, user, write, not_present)) {
+		if (user)
+			thread_current()->rsp = NULL;
 		return;
+	}
 #endif
 
 	/* Count page faults. */
