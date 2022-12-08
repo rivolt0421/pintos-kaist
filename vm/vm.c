@@ -154,6 +154,7 @@ spt_print(struct supplemental_page_table *spt) {
 		printf("%3d | p->va : %-12p  |  p->frame : %-12p  |  p->writable : %d\n",
 				cnt++, p->va, p->frame, p->writable);
 	}
+	printf("USER_STACK_BOTTOM : %p\n", thread_current()->user_stack_bottom);
 }
 
 void
@@ -245,7 +246,7 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	void *rsp = thread_current()->rsp;
-	void *usb = thread_current()->user_stack_bottom;
+	void *user_stack_bottom = thread_current()->user_stack_bottom;
 	void *fault_addr = addr;
 
 	/* TODO: Validate the fault 
@@ -259,22 +260,24 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 
 	if (page == NULL) {			
 		/* check if stack-growth case. */
-		if (rsp != NULL
-			&& (USER_STACK_LIMIT <= addr) && (addr < usb)
-			&& ((rsp - 8) == addr))
+
+		if (rsp != NULL	// not NULL if reaches here from user page-fault or kernel page-fault during syscall handling.
+			&& (USER_STACK_LIMIT <= fault_addr && fault_addr < user_stack_bottom)
+			&& ((void *)(rsp - 8) == fault_addr || fault_addr >= rsp))
 		{
-			vm_stack_growth(addr);
+			vm_stack_growth(fault_addr);
 			return true;
 		}
+
 		return false;	// should not be expected to read or write any data at the address.
 	}
-	else {
-		if (write && page->writable == 0)
-			return false;			// cannot write on read-only page.
+	
+	if (write && page->writable == 0)
+		return false;			// cannot write on read-only page.
 
-		/* Here we can say that fault was a valid demand for page. */
-		return vm_do_claim_page (page);
-	}
+	/* Here we can say that fault was a valid demand for page. */
+	return vm_do_claim_page (page);
+	
 }
 
 /* Free the page.

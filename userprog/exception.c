@@ -183,6 +183,7 @@ page_fault (struct intr_frame *f) {
 	/* Terminate the process with a -1 exit code
 	   when caused by USER process. */
 	if (user) {
+		// spt_print(&thread_current()->spt);
 		thread_current()->exit_code = -1;
 		thread_exit();
 	}

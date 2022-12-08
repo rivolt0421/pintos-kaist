@@ -81,6 +81,7 @@ void assert_valid_address(void * uaddr, bool try_to_write) {
 	if (page == NULL) {
 		/* check if stack growth case */
 		// later
+		// 스택 영역은 위에서부터 채워짐을 상기해보자.
 
 		goto terminate;
 	}

@@ -1,37 +1,37 @@
 Functionality of virtual memory subsystem:
 - Test stack growth.
-2	pt-grow-stack
-4	pt-grow-stk-sc
-3	pt-big-stk-obj
+make tests/vm/pt-grow-stack.result &&
+make tests/vm/pt-grow-stk-sc.result &&
+make tests/vm/pt-big-stk-obj.result
 
 - Test paging behavior.
-1	page-linear
-4	page-parallel
-2	page-shuffle
-2	page-merge-seq
-5	page-merge-par
-5	page-merge-mm
-5	page-merge-stk
+make tests/vm/page-linear.result &&
+make tests/vm/page-parallel.result &&
+make tests/vm/page-shuffle.result &&
+make tests/vm/page-merge-seq.result &&
+make tests/vm/page-merge-par.result &&
+make tests/vm/page-merge-mm.result &&
+make tests/vm/page-merge-stk.result
 
 - Test "mmap" system call.
-1	mmap-read
-3	mmap-write
-2	mmap-ro
-2	mmap-shuffle
-1	mmap-twice
-2	mmap-unmap
-2	mmap-exit
-3	mmap-clean
-2	mmap-close
-2	mmap-remove
-1	mmap-off
+make tests/vm/mmap-read.result &&
+make tests/vm/mmap-write.result &&
+make tests/vm/mmap-ro.result &&
+make tests/vm/mmap-shuffle.result &&
+make tests/vm/mmap-twice.result &&
+make tests/vm/mmap-unmap.result &&
+make tests/vm/mmap-exit.result &&
+make tests/vm/mmap-clean.result &&
+make tests/vm/mmap-close.result &&
+make tests/vm/mmap-remove.result &&
+make tests/vm/mmap-off.result
 
 - Test memory swapping
-3	swap-anon
-3	swap-file
-6	swap-iter
-8	swap-fork
+make tests/vm/swap-anon.result &&
+make tests/vm/swap-file.result &&
+make tests/vm/swap-iter.result &&
+make tests/vm/swap-fork.result
 
 - Test lazy loading
-4	lazy-anon
-4	lazy-file
+make tests/vm/lazy-anon&&
+make tests/vm/lazy-file

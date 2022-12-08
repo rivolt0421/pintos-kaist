@@ -52,6 +52,8 @@ uninit_initialize (struct page *page, void *kva) {
 	void *aux = uninit->aux;
 
 	/* TODO: You may need to fix this function. */
+													// vm_do_claim_page(page) ➡ swap_in (page, frame->kva) (== uninit_initialize (page, frame->kva))
+													// page와 방금 연결된 frame의 kva. 
 	return uninit->page_initializer (page, uninit->type, kva) &&
 		(init ? init (page, aux) : true);
 }
