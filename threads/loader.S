@@ -162,6 +162,7 @@ e820_parse_done:
 	
 	movl %cr0, %eax
 	orl $CR0_PE, %eax
+	orl $CR0_WP, %eax
 	movl %eax, %cr0
 	
 # We're now in protected mode in a 16-bit segment.  The CPU still has

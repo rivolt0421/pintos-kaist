@@ -19,4 +19,6 @@ struct child {
 	struct semaphore sema;
 };
 
+bool do_lazy_load (struct page *page, void *aux);
+
 #endif /* userprog/process.h */

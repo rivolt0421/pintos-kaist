@@ -10,6 +10,7 @@
 
 #include "vm/vm.h"
 #include "vm/uninit.h"
+#include "userprog/syscall.h"
 
 static bool uninit_initialize (struct page *page, void *kva);
 static void uninit_destroy (struct page *page);
@@ -68,25 +69,8 @@ uninit_destroy (struct page *page) {
 	 * TODO: If you don't have anything to do, just return. */
 
 	struct uninit_page *uninit = &page->uninit;
-	int future_type = VM_TYPE (uninit->type);
-	
-	switch (future_type) {
-		case VM_ANON:
+	struct lazy_args *la = uninit->aux;
 
-			break;
-
-		case VM_FILE:
-			PANIC("todo : uninit_destroy - VM_FILE");
-			break;
-
-		case VM_PAGE_CACHE:
-			PANIC("todo : uninit_destroy - VM_PAGE_CACHE");
-			break;
-
-		default:
-			NOT_REACHED();
-	}
-
-	free(uninit->aux);
+	free(uninit->aux);		// FREE! : lazy_args
 	uninit->aux = NULL;
 }

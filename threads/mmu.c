@@ -159,9 +159,10 @@ pml4_for_each (uint64_t *pml4, pte_for_each_func *func, void *aux) {
 static void
 pt_destroy (uint64_t *pt) {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++) {
-		uint64_t *pte = ptov((uint64_t *) pt[i]);
+		uint64_t *pte = ptov((uint64_t *) pt[i]);	// pte 에는 page base address(physical)과 확인 bit 들(오른쪽에서부터 12개 bit)이 적혀있다.
+													// page offset(physical)은 mmu가 들고 walking 하는 가상주소에 적혀있다. 여기선 무관.
 		if (((uint64_t) pte) & PTE_P)
-			palloc_free_page ((void *) PTE_ADDR (pte));		// FREE!:physical page
+			palloc_free_page ((void *) PTE_ADDR (pte));		// FREE! : physical page
 	}
 	palloc_free_page ((void *) pt);
 }
@@ -259,7 +260,7 @@ pml4_clear_page (uint64_t *pml4, void *upage) {
 	if (pte != NULL && (*pte & PTE_P) != 0) {
 		*pte &= ~PTE_P;
 		if (rcr3 () == vtop (pml4))
-			invlpg ((uint64_t) upage);
+			invlpg ((uint64_t) upage);	// invlpg :Invalidates any translation lookaside buffer (TLB) entries specified with the source operand.
 	}
 }
 

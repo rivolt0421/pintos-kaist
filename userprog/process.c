@@ -348,17 +348,37 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
+	process_cleanup ();
+
 	// process termination message
 	printf ("%s: exit(%d)\n", curr->name, curr->exit_code);
 
 	// parent and child
 	old_level = intr_disable ();
+	say_sorry_mama();
+	cleanup_child_list();
+	intr_set_level (old_level);
+
+	/* close all open files */
+	cleanup_fd_table();			// exec() 시에는 fd_table이 유지되어야 하기 때문에
+								// process_cleanup() 밖에 위치시킴.
+}
+
+void
+say_sorry_mama (void) {
+	struct thread *curr = thread_current ();
+
 	/* 부모에게 자식이(현재 프로세스가) 죽었음을 알게함 */
 	/* sorry mama... */
 	if(curr->sorry_mama != NULL){
 		curr->sorry_mama->exit_code = curr->exit_code;
 		sema_up(&curr->sorry_mama->sema);
 	}
+}
+
+void
+cleanup_child_list (void) {
+	struct thread *curr = thread_current ();
 
 	/* 현재 프로세스의 child_list를 정리함 */
 	/* 얌전히 있으면... 엄마가 금방 돌아올게...! 꼭..! */
@@ -372,18 +392,17 @@ process_exit (void) {
 			child->self_thread->sorry_mama = NULL;
 		free(child);
 	}
-	intr_set_level (old_level);
+}
 
-	/* close all open files */
-	/* exec() 시에는 fd_table이 유지되어야 하기 때문에,
-		* process_cleanup() 밖에 위치시킴 */
+void
+cleanup_fd_table (void) {
+	struct thread *curr = thread_current ();
+
 	lock_acquire(&filesys_lock);
 	for (char fd = 2; fd < FD_MAX; fd++) {
 		file_close(curr->fd_table[fd]);
 	}
 	lock_release(&filesys_lock);
-
-	process_cleanup ();
 }
 
 /* Free the current process's resources. */
@@ -585,14 +604,14 @@ load (const char *file_name, struct intr_frame *if_) {
 						zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
 								- read_bytes);
 					}
-					else {	// bss 영역은 파일에 정보가 저장될 필요가 없다(p_filesz==0).
+					else {	// bss 영역은 파일에 정보가 저장될 필요가 없다(p_filesz == 0).
 							// 해당 영역 크기(p_memsz)만 알 수 있으면 된다.
 						/* Entirely zero.
 						 * Don't read anything from disk. */
 						read_bytes = 0;
 						zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
-					}
-					if (!load_segment (file, file_page, (void *) mem_page,
+					}	   // CAUTION! ↘
+					if (!load_segment (NULL, file_page, (void *) mem_page,
 								read_bytes, zero_bytes, writable))
 						goto done;
 				}
@@ -826,27 +845,34 @@ install_page (void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
-lazy_load_segment (struct page *page, void *aux) {
+bool
+do_lazy_load (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
 	struct lazy_args *la = aux;
 
-	struct file *file = thread_current()->running_executable;
+	struct file *file = la->file ? la->file : thread_current()->running_executable;
 	off_t ofs = la->ofs;
 	size_t page_read_bytes = la->page_read_bytes;
 	size_t page_zero_bytes = la->page_zero_bytes;
+	struct frame *frame = page->frame;
 
-	file_seek(file, ofs);
+	/* read file.
+	 * filesys_lock may have already been acquired if fault occurs in filesys function. */
+	bool lock_acquired_in_here = false;
+	lock_acquire_safe(&filesys_lock, &lock_acquired_in_here);
+
 	// read page_read_bytes
-	if (file_read (file, page->va, page_read_bytes) != (int) page_read_bytes)
+	if (file_read_at (file, frame->kva, page_read_bytes, ofs) != (int) page_read_bytes)
 		return false;
-	// set page_zero_bytes
-	memset (page->va + page_read_bytes, 0, page_zero_bytes);
 
-	free(la);	// FREE!:lazy_args
-	page->uninit.aux = NULL;
+	lock_release_safe(&filesys_lock, lock_acquired_in_here);
+
+	// set page_zero_bytes
+	memset (frame->kva + page_read_bytes, 0, page_zero_bytes);
+
+	free(la);	// FREE! : lazy_args
 
 	return true;
 }
@@ -879,26 +905,27 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-		/* TODO: Set up aux to pass information to the lazy_load_segment. */
+		/* TODO: Set up aux to pass information to the do_lazy_load. */
 
-		// MALLOC!:lazy_args
+		// MALLOC! : lazy_args
 		struct lazy_args *lazy_args = malloc(sizeof(struct lazy_args));
 		if (lazy_args == NULL)
 			return false;
-		lazy_args->argc = 4;
+		lazy_args->file = file;
 		lazy_args->ofs = ofs;
 		lazy_args->page_read_bytes = page_read_bytes;
 		lazy_args->page_zero_bytes = page_zero_bytes;
+		lazy_args->root_addr = NULL;	// root_addr is only for file_page.
 
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, lazy_args))
+					writable, do_lazy_load, lazy_args))
 			return false;
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
-		ofs += PGSIZE;
+		ofs += page_read_bytes;
 	}
 	return true;
 }

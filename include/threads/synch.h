@@ -28,6 +28,8 @@ void lock_acquire (struct lock *);
 bool lock_try_acquire (struct lock *);
 void lock_release (struct lock *);
 bool lock_held_by_current_thread (const struct lock *);
+void lock_acquire_safe(struct lock *lock, bool *lock_acquired_in_here);
+void lock_release_safe(struct lock *lock, bool lock_acquired_in_here);
 
 /* Condition variable. */
 struct condition {

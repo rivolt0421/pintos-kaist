@@ -50,13 +50,14 @@ static void
 anon_destroy (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
 
-	// clean up struct frame in ft, which was mapped to this page.
+	lock_acquire(&ft_lock);
+
+	/* clean up struct frame in ft, which was mapped to this page. */
 	page->frame->kva = NULL;
 	page->frame->page = NULL;
 
 	// help ft_pointer to find empty struct frame easily.
 	ft_pointer = page->frame - ft;		// pointer arithmetic
-	
-	// printf("ft[%d] kva : %p, page : %p\n", ft_pointer, ft[ft_pointer].kva, ft[ft_pointer].page);
-	
+
+	lock_release(&ft_lock);
 }

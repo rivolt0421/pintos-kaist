@@ -32,6 +32,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
+#include "userprog/syscall.h"
+
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -197,8 +199,8 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 	
-	// enum intr_level old_level;
-	// old_level = intr_disable ();
+	enum intr_level old_level;
+	old_level = intr_disable ();
 
 	struct thread *holder = lock->holder;
 
@@ -216,7 +218,7 @@ lock_acquire (struct lock *lock) {
 	lock->holder = thread_current ();
 	thread_current()->wanted = NULL;
 
-	// intr_set_level (old_level);
+	intr_set_level (old_level);
 }
 
 void
@@ -257,8 +259,8 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
-	// enum intr_level old_level;
-	// old_level = intr_disable ();
+	enum intr_level old_level;
+	old_level = intr_disable ();
 	
 	struct thread *holder = lock->holder;
 	struct list *donor_list = &holder->donor_list;
@@ -287,7 +289,7 @@ lock_release (struct lock *lock) {
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 
-	// intr_set_level (old_level);
+	intr_set_level (old_level);
 }
 
 
@@ -300,7 +302,20 @@ lock_held_by_current_thread (const struct lock *lock) {
 
 	return lock->holder == thread_current ();
 }
-
+
+void
+lock_acquire_safe(struct lock *lock, bool *lock_acquired_in_here) {
+	if (!lock_held_by_current_thread(lock)) {
+		lock_acquire(lock);
+		*lock_acquired_in_here = true;
+	}
+}
+void
+lock_release_safe(struct lock *lock, bool lock_acquired_in_here) {
+	if (lock_acquired_in_here)
+		lock_release(lock);
+}
+
 
 /* One semaphore in a list. */
 struct semaphore_elem {

@@ -138,6 +138,7 @@ bss_init (void) {
 	   The start and end of the BSS segment is recorded by the
 	   linker as _start_bss and _end_bss.  See kernel.lds. */
 	extern char _start_bss, _end_bss;
+	printf("██ _end_bss   : %p,\n██ _start_bss : %p\n", &_end_bss, &_start_bss);
 	memset (&_start_bss, 0, &_end_bss - &_start_bss);
 }
 
@@ -150,9 +151,12 @@ paging_init (uint64_t mem_end) {
 	int perm;
 	pml4 = base_pml4 = palloc_get_page (PAL_ASSERT | PAL_ZERO);
 
-	extern char start, _end_kernel_text;
+	extern char start, _end_kernel_text, _end;
+	printf("██ _end             : %p,\n██ _end_kernel_text : %p,\n██ start            : %p\n",&_end, &_end_kernel_text, &start);
+
 	// Maps physical address [0 ~ mem_end] to
-	//   [LOADER_KERN_BASE ~ LOADER_KERN_BASE + mem_end].
+	//   [LOADER_KERN_BASE ~ LOADER_KERN_BASE + mem_end].	
+	printf("██ mem_end : %p\n", mem_end);
 	for (uint64_t pa = 0; pa < mem_end; pa += PGSIZE) {
 		uint64_t va = (uint64_t) ptov(pa);
 

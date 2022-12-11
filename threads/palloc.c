@@ -125,9 +125,11 @@ populate_pools (struct area *base_mem, struct area *ext_mem) {
 	void *free_start = pg_round_up (&_end);
 
 	uint64_t total_pages = (base_mem->size + ext_mem->size) / PGSIZE;
-	uint64_t user_pages = total_pages / 2 > user_page_limit ?	// 20 MB : 2495, 255MB(0xffe0000) : 32703
+	uint64_t user_pages = total_pages / 2 > user_page_limit ?	// 19.875 MB : 2495, 255.875MB(0xffe0000) : 32703
 		user_page_limit : total_pages / 2;
-	uint64_t kern_pages = total_pages - user_pages;
+	uint64_t kern_pages = total_pages - user_pages;				// 19.875 MB : 2496, 255.875MB(0xffe0000) : 32704
+
+	printf("██ kern_pages : %d,\n██ user_pages : %d\n", kern_pages, user_pages);
 
 	// Parse E820 map to claim the memory region for each pool.
 	enum { KERN_START, KERN, USER_START, USER } state = KERN_START;
@@ -250,7 +252,8 @@ palloc_init (void) {
 	printf ("\text_mem: 0x%llx ~ 0x%llx (Usable: %'llu kB)\n",
 		  ext_mem.start, ext_mem.end, ext_mem.size / 1024);
 	populate_pools (&base_mem, &ext_mem);
-
+	printf("██ real kernel_pages : %d\n", get_user_pages_cnt(0));
+	printf("██ real user_pages   : %d\n", get_user_pages_cnt(PAL_USER));
 	return ext_mem.end;
 }
 

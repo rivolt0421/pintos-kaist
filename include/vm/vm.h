@@ -22,6 +22,7 @@ enum vm_type {
 	 * markers, until the value is fit in the int. */
 	VM_STACK = (1 << 3),
 	VM_IMMEDIATE = (1 << 4),
+	VM_FIRST = (1 << 5),
 
 	/* DO NOT EXCEED THIS VALUE. */
 	VM_MARKER_END = (1 << 31),
@@ -95,10 +96,11 @@ struct supplemental_page_table {
 };
 
 struct lazy_args {
-	uint64_t argc;
-	uint64_t ofs;
-	uint64_t page_read_bytes;
-	uint64_t page_zero_bytes;
+	struct file *file;
+	off_t ofs;
+	uint32_t page_read_bytes;
+	uint32_t page_zero_bytes;
+	void *root_addr;	// only for file_page.
 };
 
 struct lock ft_lock;

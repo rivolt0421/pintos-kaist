@@ -148,5 +148,5 @@ entry_64:
 	xor %rbp, %rbp
 	movabs $(LOADER_KERN_BASE + 0x1000), %rsp
 	movabs $main, %rax
-	call *%rax
+	call *%rax			# pintos main () called here.
 .endfunc

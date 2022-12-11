@@ -78,6 +78,7 @@ void assert_valid_address(void * uaddr, bool try_to_write) {
 	 * and check writable for read() system call. (we have to write in user buffer to handle read() system call) */
 	struct page *page = spt_find_page(&thread_current()->spt, uaddr);
 
+	// TODO : 버퍼의 끝 지점도 page 존재하는지 확인해야 할듯.
 	if (page == NULL) {
 		/* check if stack growth case */
 		// later
@@ -194,7 +195,7 @@ void create_syscall_handler (struct intr_frame *f) {
 	lock_release(&filesys_lock);
 
 	f->R.rax = success;
-} 
+}
 
 /*
  * bool
@@ -410,9 +411,73 @@ void dup2_syscall_handler (struct intr_frame *f) {
 /* 
  * void *
  * mmap (void *addr, size_t length, int writable, int fd, off_t offset)
+ * 
+ * Maps `length` bytes the file open as `fd` starting from `offset` byte
+ * into the process's virtual address space at `addr`.
  */
 void mmap_syscall_handler (struct intr_frame *f) {
 
+	void *addr 		= f->R.rdi;
+	size_t length 	= f->R.rsi;
+	int writable	= f->R.rdx;
+	int fd 			= f->R.r10;
+	off_t offset 	= f->R.r8;
+
+	uintptr_t *fd_table = thread_current()->fd_table;
+
+	lock_acquire(&filesys_lock);
+
+// @ if addr is 0, it must fail, because some Pintos code assumes virtual page 0 is not mapped.
+// @ It must fail if addr is not page-aligned.
+	if (addr == 0 || is_kernel_vaddr(addr) || pg_ofs(addr) != 0)
+		goto fail;
+
+// @ the file descriptors representing console input and output are not mappable.
+	if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL)
+		goto fail;
+	
+// @ Your mmap should also fail when length is zero.
+// @ A call to mmap may fail if the file opened as fd has a length of zero bytes.
+	size_t file_size = file_length (fd_table[fd]);
+	if (length <= 0 || file_size <= 0)
+		goto fail;
+
+	if (pg_ofs(offset) != 0 || file_size <= offset)
+		goto fail;
+
+// In Linux, if addr is NULL, the kernel finds an appropriate address at which to create the mapping.
+// For simplicity, you can just attempt to mmap at the given addr.
+
+// @ if the range of pages mapped overlaps any existing set of mapped pages,
+//   including the stack or pages mapped at executable load time.
+// @ also should not overlap kernel space.
+	void *each_page = addr;
+	void *boundary = addr + length;
+	struct page *page = NULL;
+
+	if (is_kernel_vaddr(boundary - 1))
+		goto fail;
+
+	while (each_page < boundary) {
+		page = spt_find_page(&thread_current()->spt, each_page);
+		if (page != NULL)	// page should not exist.
+			break;
+
+		each_page += PGSIZE;
+	}
+	if (page != NULL)
+		goto fail;
+
+/* here we can say that user argumnets are valid. */
+	f->R.rax = do_mmap(addr, length, writable, fd_table[fd], offset);
+	lock_release(&filesys_lock);
+
+	return;
+	
+fail:
+	lock_release(&filesys_lock);
+	f->R.rax = NULL;
+	return;
 }  
 
 /* 
@@ -420,6 +485,32 @@ void mmap_syscall_handler (struct intr_frame *f) {
  * munmap (void *addr)
  */
 void munmap_syscall_handler (struct intr_frame *f) {
+	void *addr = f->R.rdi;
+	struct list *sp_list = &thread_current()->spt.sp_list;
+	struct page *first_page = spt_find_page(&thread_current()->spt, addr);
+
+	/* addr validity check */
+	if (first_page == NULL) {
+		printf("bad addr for munmap()");
+		return;	// silently fail...
+	}
+
+	enum vm_type type = VM_TYPE(first_page->operations->type);
+	void *root_addr = NULL;
+	if (type == VM_FILE)
+		root_addr = first_page->file.root_addr;
+	else if (type == VM_UNINIT) {
+		struct lazy_args *la = first_page->uninit.aux;
+		root_addr = la->root_addr;
+	}
+
+	if (root_addr == NULL || root_addr != addr) {
+		printf("bad addr for munmap()");
+		return;	// silently fail...
+	}
+	/* end of addr validity check */
+
+	do_munmap(addr);
 
 }  
 

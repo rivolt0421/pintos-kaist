@@ -119,6 +119,7 @@ thread_init (void) {
 	init_thread (initial_thread, "main", PRI_DEFAULT);
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
+
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -419,6 +420,11 @@ idle (void *idle_started_ UNUSED) {
 
 	idle_thread = thread_current ();
 	sema_up (idle_started);
+
+	printf("██ idle_thread                  : %p\n", idle_thread);
+	printf("██ idle_thread variable is at   : %p\n", &idle_thread);
+	printf("██ initial_thread (main thread) : %p\n", initial_thread);
+	printf("██ initial_thread variable is at: %p\n", &initial_thread);
 
 	for (;;) {
 		/* Let someone else run. */

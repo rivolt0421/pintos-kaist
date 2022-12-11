@@ -173,6 +173,14 @@ page_fault (struct intr_frame *f) {
 	/* Count page faults. */
 	page_fault_cnt++;
 
+	/* Terminate the process with a -1 exit code
+	when caused by USER process. */
+	if (user) {
+		// spt_print(&thread_current()->spt);
+		thread_current()->exit_code = -1;
+		thread_exit();
+	}
+
 	/* If the fault is true fault, show info and exit. */
 	printf ("Page fault at %p: %s error %s page in %s context.\n",
 			fault_addr,
@@ -180,13 +188,6 @@ page_fault (struct intr_frame *f) {
 			write ? "writing" : "reading",
 			user ? "user" : "kernel");
 
-	/* Terminate the process with a -1 exit code
-	   when caused by USER process. */
-	if (user) {
-		// spt_print(&thread_current()->spt);
-		thread_current()->exit_code = -1;
-		thread_exit();
-	}
 
 	kill (f);
 }
