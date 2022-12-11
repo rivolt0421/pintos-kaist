@@ -265,10 +265,10 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 	while (hash_next(&i))
 	{
 		struct page *parent_page = hash_entry(hash_cur(&i), struct page, hash_elem);
-		enum vm_type type = page_get_type(parent_page);
-		void *upage = parent_page->va;
-		bool writable = parent_page->writable;
-		vm_initializer *init = parent_page->uninit.init;
+		enum vm_type p_type = page_get_type(parent_page);
+		void *p_upage = parent_page->va;
+		bool p_writable = parent_page->writable;
+		vm_initializer *p_init = parent_page->uninit.init;
 
 		struct lazy_args *parent_args = (struct lazy_args *)parent_page->uninit.aux;
 		struct lazy_args *child_args = (struct lazy_args *)malloc(sizeof(struct lazy_args));
@@ -288,21 +288,21 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 		}
 		else if (parent_page->operations->type == VM_UNINIT)
 		{
-			if (!vm_alloc_page_with_initializer(type, upage, writable, init,
+			if (!vm_alloc_page_with_initializer(p_type, p_upage, p_writable, p_init,
 												(void *)child_args))
 				return false;
 		}
 		else
 		{
-			if (!vm_alloc_page(type, upage, writable))
+			if (!vm_alloc_page(p_type, p_upage, p_writable))
 				return false;
-			if (!vm_claim_page(upage))
+			if (!vm_claim_page(p_upage))
 				return false;
 		}
 
 		if (parent_page->operations->type != VM_UNINIT)
 		{
-			struct page *child_page = spt_find_page(dst, upage);
+			struct page *child_page = spt_find_page(dst, p_upage);
 			if (child_page == NULL)
 				return false;
 			memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
