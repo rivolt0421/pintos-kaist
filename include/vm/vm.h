@@ -4,6 +4,7 @@
 #include "threads/palloc.h"
 #include "list.h"
 #include "filesys/file.h"
+#include "lib/kernel/hash.h"
 
 enum vm_type
 {
@@ -51,7 +52,7 @@ struct page
 	struct frame *frame; /* Back reference for frame */
 
 	/* Your implementation */
-	struct list_elem elem;
+	struct hash_elem hash_elem;
 	bool writable;
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -97,7 +98,7 @@ struct page_operations
  * All designs up to you for this. */
 struct supplemental_page_table
 {
-	struct list sp_list;
+	struct hash pages;
 };
 
 struct lazy_args
@@ -106,7 +107,7 @@ struct lazy_args
 	off_t ofs;
 	uint32_t page_read_bytes;
 	uint32_t page_zero_bytes;
-	// bool writable;
+	bool writable;
 };
 
 #include "threads/thread.h"
@@ -123,6 +124,12 @@ void vm_init(void);
 bool vm_try_handle_fault(struct intr_frame *f, void *addr, bool user,
 						 bool write, bool not_present);
 
+unsigned page_hash(const struct hash_elem *, void *);
+bool page_cmp_less(const struct hash_elem *, const struct hash_elem *, void *);
+bool insert_page(struct hash *, struct page *);
+bool delete_page(struct hash *, struct page *);
+void printf_hash(struct supplemental_page_table *spt);
+
 #define vm_alloc_page(type, upage, writable) \
 	vm_alloc_page_with_initializer((type), (upage), (writable), NULL, NULL)
 bool vm_alloc_page_with_initializer(enum vm_type type, void *upage,
@@ -130,5 +137,6 @@ bool vm_alloc_page_with_initializer(enum vm_type type, void *upage,
 void vm_dealloc_page(struct page *page);
 bool vm_claim_page(void *va);
 enum vm_type page_get_type(struct page *page);
+void spt_des(struct hash_elem *e, void *aux);
 
 #endif /* VM_VM_H */

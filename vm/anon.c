@@ -22,19 +22,16 @@ void vm_anon_init(void)
 {
 	/* TODO: Set up the swap_disk. */
 	swap_disk = NULL;
+	// size_t swap_size = disk_size(swap_disk) / SECTORS_PER_PAGE;
+	// swap_table = bitmap_create(swap_size);
 }
 
 /* Initialize the file mapping */
 bool anon_initializer(struct page *page, enum vm_type type, void *kva)
 {
 	/* Set up the handler */
-	struct lazy_args *uninit_aux = (struct lazy_args *)page->uninit.aux;
-
 	page->operations = &anon_ops;
-
 	struct anon_page *anon_page = &page->anon;
-	anon_page->aux = uninit_aux;
-
 	return true;
 }
 

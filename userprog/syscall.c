@@ -69,11 +69,11 @@ void syscall_handler(struct intr_frame *f UNUSED)
 void assert_valid_address(void *uaddr)
 {
 	/* invalid if uaddr is null or kernel virtual address */
-	if (!uaddr || is_kernel_vaddr(uaddr))
-	{
-		thread_current()->exit_code = -1;
-		thread_exit();
-	}
+	// if (!uaddr || is_kernel_vaddr(uaddr))
+	// {
+	// 	thread_current()->exit_code = -1;
+	// 	thread_exit();
+	// }
 
 /* just check if uaddr is actually mapped to some physical address */
 #ifndef VM
@@ -83,12 +83,12 @@ void assert_valid_address(void *uaddr)
 		thread_exit();
 	}
 #else
-
-	if (!spt_find_page(&thread_current()->spt, uaddr))
+	if (is_kernel_vaddr(uaddr) || uaddr == NULL || spt_find_page(&thread_current()->spt, uaddr) == NULL || !(&thread_current()->pml4))
 	{
 		thread_current()->exit_code = -1;
 		thread_exit();
 	}
+	return spt_find_page(&thread_current()->spt, uaddr);
 #endif
 }
 
@@ -140,7 +140,6 @@ void fork_syscall_handler(struct intr_frame *f)
 	if (tid > 0)
 	{ // if valid tid,
 		struct child *child = find_child(child_list, tid);
-		printf("child!!!!%d\n\n", child);
 		if (child != NULL)
 		{
 			f->R.rax = tid;
