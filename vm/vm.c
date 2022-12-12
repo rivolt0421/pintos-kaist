@@ -328,6 +328,15 @@ void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 	// hash_destroy(&spt->pages, spt_des);
+	struct hash_iterator i;
+	hash_first(&i, &spt->pages);
+	while (hash_next(&i))
+	{
+		struct page *page = hash_entry(i.elem, struct page, hash_elem);
+
+		if (page->operations->type == VM_FILE)
+			do_munmap(page->va);
+	}
 	hash_clear(&spt->pages, spt_des);
 }
 

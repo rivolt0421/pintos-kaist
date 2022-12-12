@@ -860,7 +860,6 @@ bool lazy_load_segment(struct page *page, void *aux)
 
 	// read page_read_bytes
 	if (file_read(file, page->frame->kva, page_read_bytes) != (int)page_read_bytes)
-		// palloc_free_page(page->frame->kva);
 		return false;
 
 	// set page_zero_bytes

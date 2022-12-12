@@ -459,6 +459,42 @@ void dup2_syscall_handler(struct intr_frame *f)
  */
 void mmap_syscall_handler(struct intr_frame *f)
 {
+	void *addr = f->R.rdi;
+	size_t length = f->R.rsi;
+	int writable = f->R.rdx;
+	int fd = f->R.r10;
+	off_t offset = f->R.r8;
+	uintptr_t *fd_table = thread_current()->fd_table;
+
+	if (pg_ofs(offset) != 0)
+		goto err;
+
+	if (pg_ofs(addr) != 0 || is_kernel_vaddr(addr) || addr == 0)
+		goto err;
+
+	if (spt_find_page(&thread_current()->spt, addr))
+		goto err;
+
+	if (fd == 0 || fd == 1)
+	{
+		thread_current()->exit_code = -1;
+		thread_exit();
+	}
+
+	if (fd < 0 || fd >= FD_MAX || fd_table[fd] == NULL)
+		goto err;
+
+	struct file *m_file = fd_table[fd];
+
+	int file_size = file_length(fd_table[fd]);
+	if (file_size <= 0 || length <= 0)
+		goto err;
+
+	f->R.rax = do_mmap(addr, length, writable, m_file, offset);
+	return;
+err:
+	f->R.rax = NULL;
+	return;
 }
 
 /*
@@ -467,6 +503,8 @@ void mmap_syscall_handler(struct intr_frame *f)
  */
 void munmap_syscall_handler(struct intr_frame *f)
 {
+	void *addr = f->R.rdi;
+	do_munmap(addr);
 }
 
 /*
