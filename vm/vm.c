@@ -182,7 +182,7 @@ vm_get_victim (void) {
  * Return NULL on error.*/
 static struct frame *
 vm_evict_frame (void) {
-	printf("❗ eviction needed");
+	printf("❗ eviction occured");
 	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
 	if (!swap_out(victim->page))	// include clearing dirty bit and present bit.
