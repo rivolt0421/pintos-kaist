@@ -63,7 +63,7 @@ exception_init (void) {
 /* Prints exception statistics. */
 void
 exception_print_stats (void) {
-	printf ("Exception: %lld page faults\n", page_fault_cnt);
+	printf ("██ Exception: %lld page faults\n", page_fault_cnt);
 }
 
 /* Handler for an exception (probably) caused by a user process. */
@@ -154,6 +154,8 @@ page_fault (struct intr_frame *f) {
 	   be assured of reading CR2 before it changed). */
 	intr_enable ();		// CAUTION!
 
+	page_fault_cnt++;
+	
 	/* Determine cause. */
 	not_present = (f->error_code & PF_P) == 0;
 	write = (f->error_code & PF_W) != 0;
@@ -171,7 +173,6 @@ page_fault (struct intr_frame *f) {
 #endif
 
 	/* Count page faults. */
-	page_fault_cnt++;
 
 	/* Terminate the process with a -1 exit code
 	when caused by USER process. */

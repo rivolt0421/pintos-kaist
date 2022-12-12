@@ -70,6 +70,7 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	uint64_t *pml4;
 };
 
 /* The function table for page operations.

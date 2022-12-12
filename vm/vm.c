@@ -8,8 +8,6 @@
 #include "threads/mmu.h"
 
 
-
-
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -167,20 +165,29 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 /* Get the struct frame, that will be evicted. */
 static struct frame *
 vm_get_victim (void) {
-	struct frame *victim = NULL;
-	 /* TODO: The policy for eviction is up to you. */
+	undertaker %= ft_len;
 
-	return victim;
+	 /* TODO: The policy for eviction is up to you. ▶ clock algorithm */
+	while (pml4_is_accessed(ft[undertaker].pml4, ft[undertaker].page->va)) {
+		// printf("%d | %d 's accessed 1 ➡ 0\n", ft_len, undertaker);
+		pml4_set_accessed(ft[undertaker].pml4, ft[undertaker++].page->va, false);	// set accessed bit to 0 and move on.
+		undertaker %= ft_len;
+	}
+
+	// printf("💥 %d 's accessed : 0\n", undertaker);
+	return &ft[undertaker++];
 }
 
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
 static struct frame *
 vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
+	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
-
-	return NULL;
+	if (!swap_out(victim->page))	// include clearing dirty bit and present bit.
+		return NULL;
+	
+	return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -193,27 +200,34 @@ vm_get_frame (void) {
 
 	/* TODO: Fill this function. */
 	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);	// MALLOC! : physical page
-	if (kva == NULL)
-		PANIC ("todo : eviction");
 
-	/* update frame table */
-	lock_acquire(&ft_lock);
-
-	for (int i = 0; i < ft_len; i++) {
-		if (ft[ft_pointer].kva == NULL) { 
-			frame = &ft[ft_pointer];
-			ft_pointer++;
-			ft_pointer %= ft_len;
-			break;
+	if (kva == NULL) {	// run out of memory	
+		/* !!! for debug !!! */
+		for (int idx = 0; idx < ft_len; idx++) {
+			frame = &ft[idx];
+			if (frame->kva == NULL)
+				PANIC("frame table has been not updated properly.");
 		}
-		ft_pointer++;
-		ft_pointer %= ft_len;
+		/* !!! for debug !!! */
+		/* eviction */
+		frame = vm_evict_frame();
+		kva = frame->kva;
 	}
-	ASSERT (frame != NULL);	// should exist empty frame struct in ft if palloc returned valid pointer.
+	else {	// update frame table (eviction does not need this)
+		for (int i = 0; i < ft_len; i++) {
+			frame = &ft[ft_pointer++];
+			if (frame->kva == NULL) { 
+				ft_pointer %= ft_len;
+				break;
+			}
+			ft_pointer %= ft_len;
+		}
+	}
+	ASSERT (frame != NULL);
+
 	frame->kva = kva;
 	frame->page = NULL;
-	
-	lock_release(&ft_lock);
+	frame->pml4 = thread_current()->pml4;	// store pml4 of this thread, which is getting this frame.
 	
 	ASSERT (frame->page == NULL);
 	return frame;
@@ -302,12 +316,14 @@ vm_claim_page (void *va UNUSED) {
 /* Claim the PAGE and set up the mmu. */
 static bool
 vm_do_claim_page (struct page *page) {
-	struct frame *frame = vm_get_frame ();
 	struct thread *t = thread_current();
+	lock_acquire(&ft_lock);
+	struct frame *frame = vm_get_frame ();
 
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
+	lock_release(&ft_lock);
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	ASSERT(pml4_get_page (t->pml4, page->va) == NULL);
@@ -357,7 +373,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 		}
 		else if (operation_type == VM_ANON)
 		{
-			/* alloc and claim(VM_IMMEDIATE)*/
+			/* alloc and claim (with VM_IMMEDIATE)*/
 			if(!vm_alloc_page(type | VM_IMMEDIATE, va, writable))
 				return false;
 			

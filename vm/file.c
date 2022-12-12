@@ -46,26 +46,37 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
+	struct lazy_args *la = malloc(sizeof(struct lazy_args));
+
+	la->file 			= file_page->mapped_file;
+	la->page_read_bytes = file_page->valid_bytes;
+	la->page_zero_bytes = PGSIZE - file_page->valid_bytes;
+	la->ofs 			= file_page->file_offset;
+	la->root_addr 		= file_page->root_addr;
+
+	return do_lazy_load(page, la);
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
-	struct file_page *file_page UNUSED = &page->file;
+	struct file_page *file_page = &page->file;
 	struct file *mapped_file = file_page->mapped_file;
-	void *pml4 = thread_current()->pml4;
+	void *pml4 = page->frame->pml4;
 
 	if (pml4_is_dirty(pml4, page->va)) {	// check if the page is modified by process.
 		size_t valid_bytes = file_page->valid_bytes;
 		off_t file_offset = file_page->file_offset;
-
+		
 		if (valid_bytes != 0) {
 			/* write back */
 			bool lock_acquired_here = false;
 			lock_acquire_safe(&filesys_lock, &lock_acquired_here);
-
-			if (valid_bytes != file_write_at(mapped_file, page->va, valid_bytes, file_offset))
-				PANIC("file_backed_swap_out : file write fail");
+			if (valid_bytes != file_write_at(mapped_file, page->va, valid_bytes, file_offset)) {
+				printf("file_backed_swap_out : file write fail");
+				lock_release_safe(&filesys_lock, lock_acquired_here);
+				return false;
+			}
 
 			lock_release_safe(&filesys_lock, lock_acquired_here);
 		}
@@ -74,25 +85,28 @@ file_backed_swap_out (struct page *page) {
 	pml4_set_dirty(pml4, page->va, false);	// clean dirty bit.
 	pml4_clear_page(pml4, page->va);		// set PTE is not present.
 
+
 	return true;
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
 file_backed_destroy (struct page *page) {
-	struct file_page *file_page UNUSED = &page->file;
-	void *root_addr = file_page->root_addr;
+	struct file_page *file_page = &page->file;
 
-	/* call write back routine */
-	file_backed_swap_out(page);
-	
-	/* clean up struct frame in ft, which was mapped to this page. */
 	lock_acquire(&ft_lock);
 
-	// TODO : palloc free kva
+	if (pml4_get_page(thread_current()->pml4, page->va) != NULL) {
+	/* first things first, swap out. */
+		file_backed_swap_out(page);
+	
 
-	page->frame->kva = NULL;
-	page->frame->page = NULL;
+	/* clean up struct frame in ft, which was mapped to this page. */
+	// TODO : palloc free kva
+		palloc_free_page(page->frame->kva);
+		page->frame->kva = NULL;
+		page->frame->page = NULL;
+	}
 
 	// help ft_pointer to find empty struct frame easily.
 	ft_pointer = page->frame - ft;		// pointer arithmetic
@@ -132,6 +146,7 @@ do_munmap (void *addr) {
 	struct list *sp_list = &thread_current()->spt.sp_list;
 	struct file *mmaped_file = NULL;
 	
+	// spt_print(&thread_current()->spt);
 
 	struct list_elem *e = list_begin(sp_list);
 	while (e != list_end (sp_list)) {

@@ -254,6 +254,8 @@ palloc_init (void) {
 	populate_pools (&base_mem, &ext_mem);
 	printf("██ real kernel_pages : %d\n", get_user_pages_cnt(0));
 	printf("██ real user_pages   : %d\n", get_user_pages_cnt(PAL_USER));
+	printf("██ user pool base   : %p\n", user_pool.base);
+	printf("██ kernel pool base : %p\n", kernel_pool.base);
 	return ext_mem.end;
 }
 
@@ -284,7 +286,10 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt) {
 		if (flags & PAL_ASSERT)
 			PANIC ("palloc_get: out of pages");
 	}
-
+	
+	// if (pages != NULL)
+	// 	printf("👾 alloc page : %p ~ %p\n", pages, pages + PGSIZE * page_cnt);
+	
 	return pages;
 }
 

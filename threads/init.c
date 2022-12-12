@@ -151,6 +151,8 @@ paging_init (uint64_t mem_end) {
 	int perm;
 	pml4 = base_pml4 = palloc_get_page (PAL_ASSERT | PAL_ZERO);
 
+	printf("██ base_pml4 : %p\n", base_pml4);
+	
 	extern char start, _end_kernel_text, _end;
 	printf("██ _end             : %p,\n██ _end_kernel_text : %p,\n██ start            : %p\n",&_end, &_end_kernel_text, &start);
 
