@@ -4,7 +4,9 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "vm/vm.h"
 #include "intrinsic.h"
+
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -64,6 +66,7 @@ exception_init (void) {
 void
 exception_print_stats (void) {
 	printf ("██ Exception: %lld page faults\n", page_fault_cnt);
+	printf ("██ eviction_cnt: %ll\n", eviction_cnt);
 }
 
 /* Handler for an exception (probably) caused by a user process. */

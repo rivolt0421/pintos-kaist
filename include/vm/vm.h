@@ -111,6 +111,8 @@ int ft_len;
 int ft_pointer;
 int undertaker;
 
+long long eviction_cnt;
+
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);
 bool supplemental_page_table_copy (struct supplemental_page_table *dst,
