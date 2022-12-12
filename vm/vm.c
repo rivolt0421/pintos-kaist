@@ -361,16 +361,21 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 
 		if (operation_type == VM_UNINIT)
 		{
-			/* Fetch vm_initializer (not page_initializer) */
-			vm_initializer *init = src_page->uninit.init;
-			/* Duplicate args */
-			uint64_t *la = src_page->uninit.aux;
-			void *new_la = malloc(sizeof(struct lazy_args));	// MALLOC! : lazy_args
-			memcpy(new_la, la, sizeof(struct lazy_args));
+			if (type == VM_FILE) {
+				/* file backed pages (mappings) are not inherited */
+			}
+			else {
+				/* Fetch vm_initializer (not page_initializer) */
+				vm_initializer *init = src_page->uninit.init;
+				/* Duplicate args */
+				uint64_t *la = src_page->uninit.aux;
+				void *new_la = malloc(sizeof(struct lazy_args));	// MALLOC! : lazy_args
+				memcpy(new_la, la, sizeof(struct lazy_args));
 
-			/* alloc */
-			if (!vm_alloc_page_with_initializer(type, va, writable, init, new_la))
-				return false;
+				/* alloc */
+				if (!vm_alloc_page_with_initializer(type, va, writable, init, new_la))
+					return false;
+			}
 		}
 		else if (operation_type == VM_ANON)
 		{
