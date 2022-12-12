@@ -73,6 +73,11 @@ anon_swap_out (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
 	void *pml4 = page->frame->pml4;
 	if (anon_page->sec_no != -1) {
+		printf("DEBUG - page : %p\n", page);
+		printf("DEBUG - page->va : %p\n", page->va);
+		printf("DEBUG - page->frame->page : %d\n", page->frame->page);
+		printf("DEBUG - page->frame->pml4 : %d\n", page->frame->pml4);
+		printf("DEBUG - page->frame->kva : %d\n", page->frame->kva);
 		printf("DEBUG - anon_page->sec_no : %d\n", anon_page->sec_no);
 		ASSERT(anon_page->sec_no == -1);
 	}
@@ -114,10 +119,10 @@ anon_destroy (struct page *page) {
 		palloc_free_page(page->frame->kva);
 		page->frame->kva = NULL;
 		page->frame->page = NULL;
-	}
 
 	// help ft_pointer to find empty struct frame easily.
-	ft_pointer = page->frame - ft;		// pointer arithmetic
+		ft_pointer = page->frame - ft;		// pointer arithmetic
+	}
 
 	lock_release(&ft_lock);
 }

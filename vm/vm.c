@@ -184,7 +184,12 @@ vm_get_victim (void) {
 		pml4_set_accessed(ft[i].pml4, ft[i].page->va, false);
 	}
 
-	return victim ? victim : &ft[0];
+	victim = victim ? victim : &ft[0];
+	ASSERT(victim->kva != NULL);
+	ASSERT(victim->page != NULL);
+	ASSERT(pml4_get_page(victim->pml4, victim->page->va) != NULL);
+
+	return victim;
 }
 
 /* Evict one page and return the corresponding frame.
@@ -213,7 +218,7 @@ vm_get_frame (void) {
 	/* TODO: Fill this function. */
 	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);	// MALLOC! : physical page
 
-	if (kva == NULL) {	// run out of memory	
+	if (kva == NULL) {	// run out of memory
 		// /* !!! for debug !!! */
 		// for (int idx = 0; idx < ft_len; idx++) {
 		// 	frame = &ft[idx];

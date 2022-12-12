@@ -104,10 +104,10 @@ file_backed_destroy (struct page *page) {
 		palloc_free_page(page->frame->kva);
 		page->frame->kva = NULL;
 		page->frame->page = NULL;
-	}
 
 	// help ft_pointer to find empty struct frame easily.
-	ft_pointer = page->frame - ft;		// pointer arithmetic
+		ft_pointer = page->frame - ft;		// pointer arithmetic
+	}
 
 	lock_release(&ft_lock);
 }
