@@ -38,6 +38,8 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	file_page->valid_bytes = la->page_read_bytes;
 	file_page->file_offset = la->ofs;
 	file_page->root_addr = la->root_addr;
+
+	return true;
 }
 
 /* Swap in the page by read contents from the file. */
