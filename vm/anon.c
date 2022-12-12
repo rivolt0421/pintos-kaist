@@ -75,9 +75,9 @@ anon_swap_out (struct page *page) {
 	if (anon_page->sec_no != -1) {
 		printf("DEBUG - page : %p\n", page);
 		printf("DEBUG - page->va : %p\n", page->va);
-		printf("DEBUG - page->frame->page : %d\n", page->frame->page);
-		printf("DEBUG - page->frame->pml4 : %d\n", page->frame->pml4);
-		printf("DEBUG - page->frame->kva : %d\n", page->frame->kva);
+		printf("DEBUG - page->frame->page : %p\n", page->frame->page);
+		printf("DEBUG - page->frame->pml4 : %p\n", page->frame->pml4);
+		printf("DEBUG - page->frame->kva : %p\n", page->frame->kva);
 		printf("DEBUG - anon_page->sec_no : %d\n", anon_page->sec_no);
 		ASSERT(anon_page->sec_no == -1);
 	}
