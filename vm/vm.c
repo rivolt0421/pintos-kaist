@@ -189,7 +189,6 @@ bool vm_try_handle_fault(struct intr_frame *f, void *addr,
 {
 	struct supplemental_page_table *spt = &thread_current()->spt;
 	struct page *page = NULL;
-
 	/* TODO: Validate the fault
 	 * Any invalid access terminates the process and thereby frees all of its resources.*/
 	if (is_kernel_vaddr(addr)) // user try to access kernel address.
@@ -377,4 +376,26 @@ void spt_des(struct hash_elem *e, void *aux)
 {
 	const struct page *p = hash_entry(e, struct page, hash_elem);
 	free(p);
+}
+
+void printf_hash(struct supplemental_page_table *spt)
+{
+	struct hash *h = &spt->pages;
+	struct hash_iterator i;
+	hash_first(&i, h);
+	printf("===== hash 순회시작 =====\n");
+	while (hash_next(&i))
+	{
+		struct page *p = hash_entry(hash_cur(&i), struct page, hash_elem);
+		if (p->frame == NULL)
+		{
+			printf("va: %X, writable : %X\n", p->va, p->writable);
+		}
+		else
+		{
+			printf("va: %X, kva : %X, writable : %X\n", p->va, p->frame->kva,
+				   p->writable);
+		}
+	}
+	printf("===== hash 순회종료 =====\n");
 }

@@ -69,29 +69,6 @@ void syscall_handler(struct intr_frame *f UNUSED)
 
 /* This assertion should be used when
    the argument sent by user is POINTER TYPE */
-// void assert_valid_address(void *uaddr)
-// {
-// /* just check if uaddr is actually mapped to some physical address */
-// #ifndef VM
-// 	if (!pml4_get_page(thread_current()->pml4, uaddr))
-// 	{
-// 		thread_current()->exit_code = -1;
-// 		thread_exit();
-// 	}
-
-// #else
-
-// 	if (is_kernel_vaddr(uaddr) || uaddr == NULL || spt_find_page(&thread_current()->spt, uaddr) == NULL || !(&thread_current()->pml4))
-// 	{
-
-// 		thread_current()->exit_code = -1;
-// 		thread_exit();
-// 	}
-
-// 	return spt_find_page(&thread_current()->spt, uaddr);
-
-// #endif
-// }
 void assert_valid_address(void *uaddr, bool try_to_write)
 {
 	/* invalid if uaddr is null or kernel virtual address */
@@ -205,7 +182,6 @@ void exec_syscall_handler(struct intr_frame *f)
 void wait_syscall_handler(struct intr_frame *f)
 {
 	int tid = f->R.rdi;
-
 	f->R.rax = process_wait(tid);
 }
 
@@ -350,8 +326,7 @@ void read_syscall_handler(struct intr_frame *f)
  */
 void write_syscall_handler(struct intr_frame *f)
 {
-	assert_valid_address(f->R.rsi, true);
-
+	assert_valid_address(f->R.rsi, false);
 	int fd = f->R.rdi;
 	const void *buffer = f->R.rsi;
 	unsigned size = f->R.rdx;
@@ -369,6 +344,7 @@ void write_syscall_handler(struct intr_frame *f)
 		if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL)
 		{
 			f->R.rax = -1;
+
 			return;
 		}
 		lock_acquire(&filesys_lock);

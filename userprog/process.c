@@ -324,6 +324,7 @@ int process_wait(tid_t child_tid UNUSED)
 
 	if (child_tid > 0)
 	{ // if valid tid,
+		// printf("!!!!!!va %d\n\n", child_tid);
 		struct child *child = find_child(child_list, child_tid);
 		if (child != NULL)
 		{
@@ -368,7 +369,6 @@ void process_exit(void)
 
 	while (!list_empty(child_list))
 	{
-		printf("!!!!!!!!!!!!!\n\n");
 		struct list_elem *e = list_pop_front(child_list);
 		struct child *child = list_entry(e, struct child, elem);
 		if (child->sema.value == 0) // child is still alive
@@ -860,10 +860,14 @@ bool lazy_load_segment(struct page *page, void *aux)
 
 	// read page_read_bytes
 	if (file_read(file, page->frame->kva, page_read_bytes) != (int)page_read_bytes)
+	{
+		palloc_free_page(page->frame->kva);
 		return false;
+	}
 
 	// set page_zero_bytes
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+
 	return true;
 }
 

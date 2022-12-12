@@ -22,8 +22,6 @@ void test_main(void)
   CHECK(create("buffer", SIZE), "create \"buffer\"");
   CHECK((handle = open("buffer")) > 1, "open \"buffer\"");
   CHECK(mmap(buf, SIZE, 1, handle, 0) != MAP_FAILED, "mmap \"buffer\"");
-  printf("!!!!!!!!!!!!!%lx\n\n", mmap(buf, SIZE, 1, handle, 0));
-  printf("!!!!!!!!!!!!!!\n\n");
   /* Initialize. */
   for (i = 0; i < SIZE; i++)
     buf[i] = i * 257;

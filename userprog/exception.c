@@ -121,6 +121,7 @@ kill(struct intr_frame *f)
 static void
 page_fault(struct intr_frame *f)
 {
+
 	bool not_present; /* True: not-present page, false: writing r/o page. */
 	bool write;		  /* True: access was write, false: access was read. */
 	bool user;		  /* True: access by user, false: access by kernel. */
@@ -166,19 +167,14 @@ page_fault(struct intr_frame *f)
 	/* For project 3 and later. */
 	if (vm_try_handle_fault(f, fault_addr, user, write, not_present))
 	{
-		if (user)
-			thread_current()->rsp_stack = NULL;
+		thread_current()->rsp_stack = NULL;
 		return;
 	}
 #endif
-
+	thread_current()->exit_code = -1;
+	thread_exit();
 	/* Count page faults. */
 	page_fault_cnt++;
-	if (user)
-	{
-		thread_current()->exit_code = -1;
-		thread_exit();
-	}
 
 	/* If the fault is true fault, show info and exit. */
 	printf("Page fault at %p: %s error %s page in %s context.\n",
@@ -189,6 +185,5 @@ page_fault(struct intr_frame *f)
 
 	/* Terminate the process with a -1 exit code
 	   when caused by USER process. */
-
 	kill(f);
 }
