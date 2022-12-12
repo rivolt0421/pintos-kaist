@@ -165,17 +165,26 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 /* Get the struct frame, that will be evicted. */
 static struct frame *
 vm_get_victim (void) {
-	undertaker %= ft_len;
+	// undertaker %= ft_len;
 
-	 /* TODO: The policy for eviction is up to you. ▶ clock algorithm */
-	while (pml4_is_accessed(ft[undertaker].pml4, ft[undertaker].page->va)) {
-		// printf("%d | %d 's accessed 1 ➡ 0\n", ft_len, undertaker);
-		pml4_set_accessed(ft[undertaker].pml4, ft[undertaker++].page->va, false);	// set accessed bit to 0 and move on.
-		undertaker %= ft_len;
+	//  /* TODO: The policy for eviction is up to you. ▶ clock algorithm */
+	// while (pml4_is_accessed(ft[undertaker].pml4, ft[undertaker].page->va)) {
+	// 	// printf("%d | %d 's accessed 1 ➡ 0\n", ft_len, undertaker);
+	// 	pml4_set_accessed(ft[undertaker].pml4, ft[undertaker++].page->va, false);	// set accessed bit to 0 and move on.
+	// 	undertaker %= ft_len;
+	// }
+
+	// // printf("💥 %d 's accessed : 0\n", undertaker);
+	// return &ft[undertaker++];
+
+	struct frame *victim = NULL;
+	for (int i = 0 ; i < ft_len ; i++) {
+		if (!pml4_is_accessed(ft[i].pml4, ft[i].page->va))
+			victim = &ft[i];
+		pml4_set_accessed(ft[i].pml4, ft[i].page->va, false);
 	}
 
-	// printf("💥 %d 's accessed : 0\n", undertaker);
-	return &ft[undertaker++];
+	return victim ? victim : &ft[0];
 }
 
 /* Evict one page and return the corresponding frame.

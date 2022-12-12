@@ -65,8 +65,8 @@ exception_init (void) {
 /* Prints exception statistics. */
 void
 exception_print_stats (void) {
-	printf ("██ Exception: %lld page faults\n", page_fault_cnt);
-	printf ("██ eviction_cnt: %lld evictions\n", eviction_cnt);
+	printf ("🎃 Exception: %lld page faults\n", page_fault_cnt);
+	printf ("💀 eviction_cnt: %lld evictions\n", eviction_cnt);
 }
 
 /* Handler for an exception (probably) caused by a user process. */
