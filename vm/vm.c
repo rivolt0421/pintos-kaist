@@ -182,6 +182,7 @@ vm_get_victim (void) {
  * Return NULL on error.*/
 static struct frame *
 vm_evict_frame (void) {
+	printf("❗ eviction needed");
 	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
 	if (!swap_out(victim->page))	// include clearing dirty bit and present bit.
@@ -202,13 +203,13 @@ vm_get_frame (void) {
 	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);	// MALLOC! : physical page
 
 	if (kva == NULL) {	// run out of memory	
-		/* !!! for debug !!! */
-		for (int idx = 0; idx < ft_len; idx++) {
-			frame = &ft[idx];
-			if (frame->kva == NULL)
-				PANIC("frame table has been not updated properly.");
-		}
-		/* !!! for debug !!! */
+		// /* !!! for debug !!! */
+		// for (int idx = 0; idx < ft_len; idx++) {
+		// 	frame = &ft[idx];
+		// 	if (frame->kva == NULL)
+		// 		PANIC("frame table has been not updated properly.");
+		// }
+		// /* !!! for debug !!! */
 		/* eviction */
 		frame = vm_evict_frame();
 		kva = frame->kva;
