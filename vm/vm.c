@@ -170,6 +170,11 @@ vm_get_frame(void)
 static void
 vm_stack_growth(void *addr UNUSED)
 {
+	if (vm_alloc_page(VM_ANON | VM_STACK, addr, true))
+	{
+		vm_claim_page(addr);
+		thread_current()->stack_bottom -= PGSIZE;
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -190,18 +195,23 @@ bool vm_try_handle_fault(struct intr_frame *f, void *addr,
 	if (is_kernel_vaddr(addr)) // user try to access kernel address.
 		return false;
 
-	page = spt_find_page(spt, addr);
-	if (page == NULL) // user should not expect any data at the address. (== cannot find page from spt list)
-		return false;
-
+	void *rsp_stack =
+		is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
 	if (not_present)
 	{
 		if (!vm_claim_page(addr))
+		{
+			if (rsp_stack - 8 <= addr && USER_STACK - 0x100000 <= addr &&
+				addr <= USER_STACK)
+			{
+				vm_stack_growth(thread_current()->stack_bottom - PGSIZE);
+				return true;
+			}
 			return false;
+		}
 		else
 			return true;
 	}
-
 	return false;
 }
 
@@ -282,6 +292,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 			child_args->page_read_bytes = parent_args->page_read_bytes;
 			child_args->page_zero_bytes = parent_args->page_zero_bytes;
 		}
+
 		if (parent_page->uninit.type & VM_STACK)
 		{
 			setup_stack(&thread_current()->tf);
@@ -316,6 +327,7 @@ void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)
 {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+	// hash_destroy(&spt->pages, spt_des);
 	hash_clear(&spt->pages, spt_des);
 }
 
@@ -355,6 +367,5 @@ bool delete_page(struct hash *pages, struct page *p)
 void spt_des(struct hash_elem *e, void *aux)
 {
 	const struct page *p = hash_entry(e, struct page, hash_elem);
-	vm_dealloc_page(p);
-	// free(p);
+	free(p);
 }

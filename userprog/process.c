@@ -241,6 +241,7 @@ __do_fork(void **aux)
 	supplemental_page_table_init(&current->spt);
 	if (!supplemental_page_table_copy(&current->spt, &parent->spt))
 		goto error;
+	current->stack_bottom = parent->stack_bottom;
 #else
 	if (!pml4_for_each(parent->pml4, duplicate_pte, parent))
 		goto error;
@@ -367,6 +368,7 @@ void process_exit(void)
 
 	while (!list_empty(child_list))
 	{
+		printf("!!!!!!!!!!!!!\n\n");
 		struct list_elem *e = list_pop_front(child_list);
 		struct child *child = list_entry(e, struct child, elem);
 		if (child->sema.value == 0) // child is still alive
@@ -404,6 +406,8 @@ process_cleanup(void)
 	{ // 이거 조건 안주면 Spt없는 경우 필터링이 안됨
 		supplemental_page_table_kill(&curr->spt);
 	}
+	curr->rsp_stack = NULL;
+	curr->stack_bottom = NULL;
 #endif
 
 	uint64_t *pml4;
@@ -856,10 +860,8 @@ bool lazy_load_segment(struct page *page, void *aux)
 
 	// read page_read_bytes
 	if (file_read(file, page->frame->kva, page_read_bytes) != (int)page_read_bytes)
-	{
-		palloc_free_page(page->frame->kva);
+		// palloc_free_page(page->frame->kva);
 		return false;
-	}
 
 	// set page_zero_bytes
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
@@ -923,8 +925,6 @@ bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
 bool setup_stack(struct intr_frame *if_)
 {
 	bool success = false;
-	bool one = false;
-	bool two = false;
 	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately. */
@@ -932,10 +932,6 @@ bool setup_stack(struct intr_frame *if_)
 	/* TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
 
-	// if (!vm_alloc_page(VM_ANON | VM_STACK, stack_bottom, true))
-	// 	return false;
-	// if_->rsp = USER_STACK;
-	// return vm_claim_page(stack_bottom);
 	if (vm_alloc_page(VM_ANON | VM_STACK, stack_bottom, true))
 	{
 		success = vm_claim_page(stack_bottom);
@@ -947,4 +943,5 @@ bool setup_stack(struct intr_frame *if_)
 	}
 	return success;
 }
+
 #endif /* VM */

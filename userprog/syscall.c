@@ -15,6 +15,7 @@
 #include "threads/mmu.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
+#include "vm/vm.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -50,6 +51,7 @@ void syscall_init(void)
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f UNUSED)
 {
+	thread_current()->rsp_stack = f->rsp;
 	syscall_handler_func *handler;
 
 	handler = syscall_handlers[f->R.rax];
@@ -62,34 +64,55 @@ void syscall_handler(struct intr_frame *f UNUSED)
 		intr_dump_frame(f);
 		PANIC("Unexpected system call");
 	}
+	thread_current()->rsp_stack = NULL;
 }
 
 /* This assertion should be used when
    the argument sent by user is POINTER TYPE */
-void assert_valid_address(void *uaddr)
+// void assert_valid_address(void *uaddr)
+// {
+// /* just check if uaddr is actually mapped to some physical address */
+// #ifndef VM
+// 	if (!pml4_get_page(thread_current()->pml4, uaddr))
+// 	{
+// 		thread_current()->exit_code = -1;
+// 		thread_exit();
+// 	}
+
+// #else
+
+// 	if (is_kernel_vaddr(uaddr) || uaddr == NULL || spt_find_page(&thread_current()->spt, uaddr) == NULL || !(&thread_current()->pml4))
+// 	{
+
+// 		thread_current()->exit_code = -1;
+// 		thread_exit();
+// 	}
+
+// 	return spt_find_page(&thread_current()->spt, uaddr);
+
+// #endif
+// }
+void assert_valid_address(void *uaddr, bool try_to_write)
 {
 	/* invalid if uaddr is null or kernel virtual address */
-	// if (!uaddr || is_kernel_vaddr(uaddr))
-	// {
-	// 	thread_current()->exit_code = -1;
-	// 	thread_exit();
-	// }
+	if (!uaddr || is_kernel_vaddr(uaddr))
+		goto err;
 
-/* just check if uaddr is actually mapped to some physical address */
-#ifndef VM
-	if (!pml4_get_page(thread_current()->pml4, uaddr))
-	{
-		thread_current()->exit_code = -1;
-		thread_exit();
-	}
-#else
-	if (is_kernel_vaddr(uaddr) || uaddr == NULL || spt_find_page(&thread_current()->spt, uaddr) == NULL || !(&thread_current()->pml4))
-	{
-		thread_current()->exit_code = -1;
-		thread_exit();
-	}
-	return spt_find_page(&thread_current()->spt, uaddr);
-#endif
+	/* check if user can expect data at the address,
+	 * and check writable for read() system call. (we have to write in user buffer to handle read() system call) */
+	struct page *page = spt_find_page(&thread_current()->spt, uaddr);
+
+	if (page == NULL)
+		goto err;
+
+	if (try_to_write && page->writable == 0)
+		goto err;
+
+	return; // success.
+
+err:
+	thread_current()->exit_code = -1;
+	thread_exit();
 }
 
 struct child *find_child(struct list *child_list, int tid)
@@ -157,7 +180,7 @@ void fork_syscall_handler(struct intr_frame *f)
  */
 void exec_syscall_handler(struct intr_frame *f)
 {
-	assert_valid_address(f->R.rdi);
+	assert_valid_address(f->R.rdi, false);
 
 	char *arg, *arg_copy;
 	arg = f->R.rdi;
@@ -192,7 +215,7 @@ void wait_syscall_handler(struct intr_frame *f)
  */
 void create_syscall_handler(struct intr_frame *f)
 {
-	assert_valid_address(f->R.rdi);
+	assert_valid_address(f->R.rdi, false);
 
 	char *name = f->R.rdi;
 	unsigned initial_size = f->R.rsi;
@@ -209,7 +232,7 @@ void create_syscall_handler(struct intr_frame *f)
  */
 void remove_syscall_handler(struct intr_frame *f)
 {
-	assert_valid_address(f->R.rdi);
+	assert_valid_address(f->R.rdi, false);
 
 	char *name = f->R.rdi;
 	lock_acquire(&filesys_lock);
@@ -225,7 +248,7 @@ void remove_syscall_handler(struct intr_frame *f)
  */
 void open_syscall_handler(struct intr_frame *f)
 {
-	assert_valid_address(f->R.rdi);
+	assert_valid_address(f->R.rdi, false);
 
 	char *file_name = f->R.rdi;
 	uintptr_t *fd_table = thread_current()->fd_table;
@@ -246,7 +269,6 @@ void open_syscall_handler(struct intr_frame *f)
 		f->R.rax = -1;
 		return;
 	}
-
 	/* find empty entry */
 	for (char idx = 2; idx < FD_MAX; idx++)
 	{
@@ -292,7 +314,7 @@ void filesize_syscall_handler(struct intr_frame *f)
  */
 void read_syscall_handler(struct intr_frame *f)
 {
-	assert_valid_address(f->R.rsi);
+	assert_valid_address(f->R.rsi, true);
 	int fd = f->R.rdi;
 	char *buffer = f->R.rsi;
 	unsigned size = f->R.rdx;
@@ -315,9 +337,9 @@ void read_syscall_handler(struct intr_frame *f)
 			f->R.rax = -1;
 			return;
 		}
-		// lock_acquire(&filesys_lock);
+		lock_acquire(&filesys_lock);
 		read_bytes = file_read(fd_table[fd], buffer, size);
-		// lock_release(&filesys_lock);
+		lock_release(&filesys_lock);
 	}
 	f->R.rax = read_bytes;
 }
@@ -328,7 +350,7 @@ void read_syscall_handler(struct intr_frame *f)
  */
 void write_syscall_handler(struct intr_frame *f)
 {
-	assert_valid_address(f->R.rsi);
+	assert_valid_address(f->R.rsi, true);
 
 	int fd = f->R.rdi;
 	const void *buffer = f->R.rsi;
