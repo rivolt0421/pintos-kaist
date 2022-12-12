@@ -8,8 +8,6 @@
 #include "userprog/process.h"
 #include "userprog/syscall.h"
 
-
-
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
 static void file_backed_destroy (struct page *page);
@@ -43,6 +41,7 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 }
 
 /* Swap in the page by read contents from the file. */
+/* pml4_set_page() already done by caller*/
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
@@ -81,11 +80,6 @@ file_backed_swap_out (struct page *page) {
 			lock_release_safe(&filesys_lock, lock_acquired_here);
 		}
 	}
-
-	pml4_set_dirty(pml4, page->va, false);	// clean dirty bit.
-	pml4_clear_page(pml4, page->va);		// set PTE is not present.
-
-
 	return true;
 }
 
@@ -99,7 +93,9 @@ file_backed_destroy (struct page *page) {
 	if (pml4_get_page(thread_current()->pml4, page->va) != NULL) {
 	/* first things first, swap out. */
 		file_backed_swap_out(page);
-	
+
+		pml4_set_dirty(thread_current()->pml4, page->va, false);	// clean dirty bit.
+		pml4_clear_page(thread_current()->pml4, page->va);		// set PTE is not present.
 
 	/* clean up struct frame in ft, which was mapped to this page. */
 	// TODO : palloc free kva

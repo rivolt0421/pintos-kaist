@@ -41,6 +41,7 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 }
 
 /* Swap in the page by read contents from the swap disk. */
+/* pml4_set_page() already done by caller*/
 static bool
 anon_swap_in (struct page *page, void *kva) {
 	struct anon_page *anon_page = &page->anon;
@@ -90,9 +91,6 @@ anon_swap_out (struct page *page) {
 		disk_write(swap_disk, sec_no + i, slice);
 		slice += DISK_SECTOR_SIZE;
 	}
-
-	pml4_set_dirty(pml4, page->va, false);	// clean dirty bit.
-	pml4_clear_page(pml4, page->va);		// set PTE is not present.
 
 	return true;
 }

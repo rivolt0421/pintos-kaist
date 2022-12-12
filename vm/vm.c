@@ -185,9 +185,11 @@ vm_evict_frame (void) {
 	eviction_cnt++;
 	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
-	if (!swap_out(victim->page))	// include clearing dirty bit and present bit.
+	if (!swap_out(victim->page))
 		return NULL;
-	
+
+	pml4_set_dirty(victim->pml4, victim->page->va, false);	// clean dirty bit.
+	pml4_clear_page(victim->pml4, victim->page->va);		// set PTE is not present.
 	return victim;
 }
 
@@ -318,9 +320,8 @@ vm_claim_page (void *va UNUSED) {
 static bool
 vm_do_claim_page (struct page *page) {
 	struct thread *t = thread_current();
-	lock_acquire(&ft_lock);
+	lock_acquire(&ft_lock); 
 	struct frame *frame = vm_get_frame ();
-
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
