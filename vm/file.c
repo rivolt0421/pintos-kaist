@@ -90,7 +90,6 @@ static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page = &page->file;
 
-	lock_acquire(&ft_lock);
 
 	if (pml4_get_page(thread_current()->pml4, page->va) != NULL) {
 	/* first things first, swap out. */
@@ -109,7 +108,6 @@ file_backed_destroy (struct page *page) {
 		ft_pointer = page->frame - ft;		// pointer arithmetic
 	}
 
-	lock_release(&ft_lock);
 }
 
 /* 
@@ -145,7 +143,8 @@ do_munmap (void *addr) {
 	struct file *mmaped_file = NULL;
 	
 	// spt_print(&thread_current()->spt);
-
+	bool lock_acquired_here = false;
+	lock_acquire_safe(&swap_lock, &lock_acquired_here);
 	struct list_elem *e = list_begin(sp_list);
 	while (e != list_end (sp_list)) {
 		struct page *page = list_entry(e, struct page, elem);
@@ -178,6 +177,7 @@ do_munmap (void *addr) {
 		/* not related pages */
 		e = list_next(e);
 	}
+	lock_release_safe(&swap_lock, lock_acquired_here);
 
 	ASSERT(mmaped_file != NULL);
 

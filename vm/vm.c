@@ -25,12 +25,10 @@ vm_init (void) {
 	int user_pages = get_user_pages_cnt(PAL_USER);
 	ft = malloc(sizeof(struct frame) * user_pages);		// MALLOC! : ft
 	ft_len = user_pages;
-	ft_pointer = undertaker = 0;
 	for (int i = 0 ; i < ft_len ; i++) {
 		ft[i].kva = NULL;
 		ft[i].page = NULL;
 	}
-	lock_init(&ft_lock);
 
 	// printf("ft_len: %d\n", ft_len);
 }
@@ -199,11 +197,13 @@ vm_evict_frame (void) {
 	eviction_cnt++;
 	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
+
 	if (!swap_out(victim->page))
 		return NULL;
 
 	pml4_set_dirty(victim->pml4, victim->page->va, false);	// clean dirty bit.
 	pml4_clear_page(victim->pml4, victim->page->va);		// set PTE is not present.
+
 	return victim;
 }
 
@@ -308,7 +308,12 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 		return false;			// cannot write on read-only page.
 
 	/* Here we can say that fault was a valid demand for page. */
-	return vm_do_claim_page (page);
+	bool lock_acquired_here = false;
+	lock_acquire_safe(&swap_lock, &lock_acquired_here);
+	bool success = vm_do_claim_page (page);
+	lock_release_safe(&swap_lock, lock_acquired_here);
+	
+	return success;
 	
 }
 
@@ -334,12 +339,10 @@ vm_claim_page (void *va UNUSED) {
 static bool
 vm_do_claim_page (struct page *page) {
 	struct thread *t = thread_current();
-	lock_acquire(&ft_lock); 
 	struct frame *frame = vm_get_frame ();
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
-	lock_release(&ft_lock);
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	ASSERT(pml4_get_page (t->pml4, page->va) == NULL);
@@ -422,6 +425,8 @@ supplemental_page_table_kill (struct supplemental_page_table *spt) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 
+	bool lock_acquired_here = false;
+	lock_acquire_safe(&swap_lock, &lock_acquired_here);
 	while (!list_empty (&spt->sp_list)) {
 		struct list_elem *e = list_front(&spt->sp_list);
 		struct page *page = list_entry(e, struct page, elem);
@@ -440,5 +445,6 @@ supplemental_page_table_kill (struct supplemental_page_table *spt) {
 			vm_dealloc_page(page);	// destroy and free page.
 		}
 	}
+	lock_release_safe(&swap_lock, lock_acquired_here);
 	spt_print(spt);
 }

@@ -56,14 +56,9 @@ anon_swap_in (struct page *page, void *kva) {
 		slice += DISK_SECTOR_SIZE;
 	}
 
-	bool lock_acquired_here = false;
-	lock_acquire_safe(&swap_lock, &lock_acquired_here);
-
 	bitmap_set_multiple(swap_table, sec_no, 8, false);	// mark previously occupied 8 slots free.
-
-	lock_release_safe(&swap_lock, lock_acquired_here);
-	
 	anon_page->sec_no = -1;
+	
 	return true;
 }
 
@@ -83,15 +78,12 @@ anon_swap_out (struct page *page) {
 	}
 
 	/* find empty swap slot */
-	bool lock_acquired_here = false;
-	lock_acquire_safe(&swap_lock, &lock_acquired_here);
 									// 512 bytes (per sector) * 8 = 4096 bytes (one page)
 	disk_sector_t sec_no = bitmap_scan_and_flip(swap_table, 0, 8, false);	// find consecutive 8 empty slots and mark(flip) them occupied(true).
 	if (sec_no == BITMAP_ERROR)
 		PANIC("The Notorious O.O.M.");
 	anon_page->sec_no = sec_no;		// remember sec_no for swap in.
 
-	lock_release_safe(&swap_lock, lock_acquired_here);
 
 	void *slice = page->frame->kva;
 	for (int i = 0 ; i < 8 ; i++) {
@@ -107,7 +99,6 @@ static void
 anon_destroy (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
 
-	lock_acquire(&ft_lock);
 
 	if (pml4_get_page(thread_current()->pml4, page->va) != NULL) {
 
@@ -124,5 +115,4 @@ anon_destroy (struct page *page) {
 		ft_pointer = page->frame - ft;		// pointer arithmetic
 	}
 
-	lock_release(&ft_lock);
 }

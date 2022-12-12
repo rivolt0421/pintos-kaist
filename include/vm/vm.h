@@ -104,12 +104,9 @@ struct lazy_args {
 	void *root_addr;	// only for file_page.
 };
 
-struct lock ft_lock;
-
 struct frame *ft;
 int ft_len;
 int ft_pointer;
-int undertaker;
 
 long long eviction_cnt;
 
