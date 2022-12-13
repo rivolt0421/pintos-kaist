@@ -64,17 +64,17 @@ do_mmap(void *addr, size_t length, int writable,
 
 	while (read_byte > 0 || zero_byte > 0)
 	{
-		size_t page_read_byte = read_byte > PGSIZE ? PGSIZE : read_byte;
+		size_t page_read_byte = read_byte < PGSIZE ? PGSIZE : read_byte;
 		size_t page_zero_byte = PGSIZE - read_byte;
 
-		struct lazy_args *m_lazy_args = (struct lazy_args *)malloc(sizeof(struct lazy_args));
-		m_lazy_args->file = m_file;
-		m_lazy_args->ofs = offset;
-		m_lazy_args->page_read_bytes = page_read_byte;
-		m_lazy_args->page_zero_bytes = page_zero_byte;
-		m_lazy_args->writable = writable;
+		struct lazy_args *m_la = (struct lazy_args *)malloc(sizeof(struct lazy_args));
+		m_la->file = m_file;
+		m_la->ofs = offset;
+		m_la->page_read_bytes = page_read_byte;
+		m_la->page_zero_bytes = page_zero_byte;
+		m_la->writable = writable;
 
-		if (!vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, m_lazy_args))
+		if (!vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, m_la))
 			return NULL;
 
 		read_byte -= page_read_byte;
@@ -82,6 +82,7 @@ do_mmap(void *addr, size_t length, int writable,
 		addr += PGSIZE;
 		offset += page_read_byte;
 	}
+
 	return m_addr;
 }
 /* Do the munmap */

@@ -191,9 +191,9 @@ bool vm_try_handle_fault(struct intr_frame *f, void *addr,
 	struct page *page = NULL;
 	/* TODO: Validate the fault
 	 * Any invalid access terminates the process and thereby frees all of its resources.*/
-	if (is_kernel_vaddr(addr)) // user try to access kernel address.
+	if (is_kernel_vaddr(addr))
+		// user try to access kernel address.
 		return false;
-
 	void *rsp_stack =
 		is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
 	if (not_present)
@@ -248,7 +248,9 @@ vm_do_claim_page(struct page *page)
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	if (install_page(page->va, frame->kva, page->writable))
+	{
 		return swap_in(page, frame->kva);
+	}
 
 	return false;
 }

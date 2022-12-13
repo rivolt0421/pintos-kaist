@@ -348,6 +348,7 @@ void process_exit(void)
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+	process_cleanup();
 
 	// if user thread (process),
 
@@ -356,12 +357,28 @@ void process_exit(void)
 	old_level = intr_disable();
 	/* 부모에게 자식이(현재 프로세스가) 죽었음을 알게함 */
 	/* sorry mama... */
+	say_sorry_mama();
+	cleanup_child_list();
+	intr_set_level(old_level);
+
+	/* close all open files */
+	cleanup_fd_table(); // exec() 시에는 fd_table이 유지되어야 하기 때문에
+						// process_cleanup() 밖에 위치시킴.
+}
+
+void say_sorry_mama(void)
+{
+	struct thread *curr = thread_current();
 	if (curr->sorry_mama != NULL)
 	{
 		curr->sorry_mama->exit_code = curr->exit_code;
 		sema_up(&curr->sorry_mama->sema);
 	}
+}
 
+void cleanup_child_list(void)
+{
+	struct thread *curr = thread_current();
 	/* 현재 프로세스의 child_list를 정리함 */
 	/* 얌전히 있으면... 엄마가 금방 돌아올게...! 꼭..! */
 	struct list *child_list = &curr->child_list;
@@ -375,7 +392,11 @@ void process_exit(void)
 			child->self_thread->sorry_mama = NULL;
 		free(child);
 	}
-	intr_set_level(old_level);
+}
+
+void cleanup_fd_table(void)
+{
+	struct thread *curr = thread_current();
 
 	/* close all open files */
 	/* exec() 시에는 fd_table이 유지되어야 하기 때문에,
@@ -386,7 +407,6 @@ void process_exit(void)
 		file_close(curr->fd_table[fd]);
 	}
 	lock_release(&filesys_lock);
-	process_cleanup();
 }
 
 /* Free the current process's resources. */
