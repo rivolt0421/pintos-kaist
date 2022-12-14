@@ -44,3 +44,4 @@ make tests/vm/swap-iter.result &&
 make tests/vm/swap-fork.result &&
 make tests/vm/lazy-anon.result &&
 make tests/vm/lazy-file.result
+
