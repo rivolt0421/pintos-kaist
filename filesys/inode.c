@@ -87,17 +87,18 @@ inode_create (cluster_t clst, off_t length) {
 		disk_inode->magic = INODE_MAGIC;
 
 		cluster_t start = 0;
-		if (sectors > 0) {
-			static char zeros[DISK_SECTOR_SIZE];
-			cluster_t c;
-			start = fat_create_chain(0);
-			if (start != 0) {
-				disk_inode->start = start;
-				disk_write (filesys_disk, cluster_to_sector(clst), disk_inode);	// write inode itself.
-				bool create_chain_fail = false;
+		start = fat_create_chain(0);
+		if (start != 0) {
+			disk_inode->start = start;
+			disk_write (filesys_disk, cluster_to_sector(clst), disk_inode);	// write inode itself.
+			
+			bool create_chain_fail = false;
+			if (sectors > 0) {
+				static char zeros[DISK_SECTOR_SIZE];
+				cluster_t c;
+
 				c = start;
 				disk_write (filesys_disk, cluster_to_sector(c), zeros);	// write for data (first cluster).
-
 				for (size_t i = 0; i < sectors - 1; i++) {
 					c = fat_create_chain(c);
 					if (c == 0) {
@@ -107,9 +108,9 @@ inode_create (cluster_t clst, off_t length) {
 					disk_write (filesys_disk, cluster_to_sector(c), zeros);	// write for data (subsequent clusters).
 				}
 
-				if (!create_chain_fail)
-					success = true;
 			}
+			if (!create_chain_fail)
+				success = true;
 		}
 		free (disk_inode);
 		if (!success && start != 0) {
