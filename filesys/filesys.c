@@ -6,6 +6,7 @@
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
+#include "filesys/fat.h"
 #include "devices/disk.h"
 
 /* The disk that contains the file system. */
@@ -21,15 +22,16 @@ filesys_init (bool format) {
 	if (filesys_disk == NULL)
 		PANIC ("hd0:1 (hdb) not present, file system initialization failed");
 
-	inode_init ();
+	inode_init ();		// list_init (&open_inodes);
 
 #ifdef EFILESYS
-	fat_init ();
+	fat_init ();		// load boot sector
 
 	if (format)
 		do_format ();
 
-	fat_open ();
+	fat_open ();		// Load FAT directly from the disk
+	fat_fs_print();
 #else
 	/* Original FS */
 	free_map_init ();
@@ -59,14 +61,14 @@ filesys_done (void) {
  * or if internal memory allocation fails. */
 bool
 filesys_create (const char *name, off_t initial_size) {
-	disk_sector_t inode_sector = 0;
+	cluster_t inode_clst = 0;
 	struct dir *dir = dir_open_root ();
 	bool success = (dir != NULL
-			&& free_map_allocate (1, &inode_sector)
-			&& inode_create (inode_sector, initial_size)
-			&& dir_add (dir, name, inode_sector));
-	if (!success && inode_sector != 0)
-		free_map_release (inode_sector, 1);
+			&& (inode_clst = fat_create_chain (0))
+			&& inode_create (inode_clst, initial_size)
+			&& dir_add (dir, name, inode_clst));
+	if (!success)
+		fat_remove_chain(inode_clst, 0);
 	dir_close (dir);
 
 	return success;
@@ -110,6 +112,8 @@ do_format (void) {
 #ifdef EFILESYS
 	/* Create FAT and save it to the disk. */
 	fat_create ();
+	if (!dir_create (ROOT_DIR_CLUSTER, 16))
+		PANIC ("root directory creation failed");
 	fat_close ();
 #else
 	free_map_create ();
