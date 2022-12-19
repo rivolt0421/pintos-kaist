@@ -226,7 +226,7 @@ void open_syscall_handler (struct intr_frame *f) {
 	uintptr_t file_opened;
 
 	/* check file_name and fd_count */
-	if (!file_name || thread_current()->fd_count >= FD_MAX) {
+	if (!file_name || *file_name == '\0' || thread_current()->fd_count >= FD_MAX) {
 		f->R.rax = -1;
 		return;
 	}
