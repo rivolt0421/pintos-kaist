@@ -207,6 +207,12 @@ void remove_syscall_handler (struct intr_frame *f) {
 	assert_valid_address(f->R.rdi, false);
 	
 	char *name = f->R.rdi;
+	/* cannot remove root directory */
+	if (strcmp(name, "/") == 0) {
+		f->R.rax = false;
+		return;		
+	}
+	
 	lock_acquire(&filesys_lock);
 	bool success = filesys_remove(name);
 	lock_release(&filesys_lock);
@@ -230,8 +236,12 @@ void open_syscall_handler (struct intr_frame *f) {
 		f->R.rax = -1;
 		return;
 	}
+
 	lock_acquire(&filesys_lock);
-	file_opened = filesys_open(file_name);
+	if (strcmp(file_name, "/") == 0)	// for opening root directory
+		file_opened = dir_open_root();
+	else
+		file_opened = filesys_open(file_name);
 	lock_release(&filesys_lock);
 
 	/* check the file has been successfully opened */
@@ -331,6 +341,13 @@ void write_syscall_handler (struct intr_frame *f) {
 			f->R.rax = -1;
 			return;
 		}
+		/* cannot write to directory */
+		uintptr_t file_or_dir = fd_table[fd];
+		if (inode_get_type(*(uintptr_t *)file_or_dir) == 1) {
+			f->R.rax = -1;
+			return;			
+		}
+
 		lock_acquire(&filesys_lock);
 		written_bytes = file_write(fd_table[fd], buffer, size);
 		lock_release(&filesys_lock);
@@ -548,7 +565,12 @@ void chdir_syscall_handler (struct intr_frame *f) {
 	bool success = false;
 
 	lock_acquire(&filesys_lock);
-	uintptr_t dir = filesys_open(dir_name);
+	uintptr_t dir = NULL;
+	if (strcmp(dir_name, "/") == 0)	// for opening root directory
+		dir = dir_open_root();
+	else
+		dir = filesys_open(dir_name);
+		
 	if (dir != NULL) {
 		dir_close(thread_current()->cwd);
 		thread_current()->cwd = dir;
