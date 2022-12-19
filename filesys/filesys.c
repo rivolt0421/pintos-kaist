@@ -124,8 +124,9 @@ filesys_open (const char *name) {
 	struct dir *base_dir = *name == '/' ? dir_open_root() : dir_reopen(thread_current()->cwd);
 	char long_name[READDIR_MAX_LEN+1];
 	strlcpy(long_name, name, READDIR_MAX_LEN+1);
-	long_name[strlen(name)] = '/';
-	long_name[strlen(name)+1] = '\0';
+	int len = strlen(name);
+	long_name[len] = '/';
+	long_name[len+1] = '\0';
 
 	struct inode *inode = NULL;
 
@@ -164,9 +165,14 @@ filesys_remove (const char *name) {
 		strlcpy (filename, f, READDIR_MAX_LEN+1);
 		*f = '\0';							// dirname  : "/"   || "/foo/" || "foo/"
 											// filename : "foo" || "bar"   || "bar"
-		struct inode *inode;
-		if(dir_lookup(base_dir, dirname, &inode))
-			dir = dir_open(inode);
+		if (strcmp(dirname, "/") == 0) {
+			dir = dir_open_root(); 
+		}
+		else {
+			struct inode *inode;
+			if(dir_lookup(base_dir, dirname, &inode))
+				dir = dir_open(inode);
+		}
 	}
 	else {				// name : "foo"
 		strlcpy (filename, long_name, READDIR_MAX_LEN+1);
@@ -197,7 +203,9 @@ filesys_remove (const char *name) {
 	if (success)
 		success = dir_remove(dir, filename);
 
+	dir_close (base_dir);
 	dir_close (dir);
+
 	return success;
 }
 
