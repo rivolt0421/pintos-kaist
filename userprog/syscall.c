@@ -11,6 +11,8 @@
 #include "intrinsic.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "filesys/inode.h"
+#include "filesys/directory.h"
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
 #include "threads/malloc.h"
@@ -191,7 +193,7 @@ void create_syscall_handler (struct intr_frame *f) {
 	char *name = f->R.rdi;
 	unsigned initial_size = f->R.rsi;
 	lock_acquire(&filesys_lock);
-	bool success = filesys_create(name, initial_size);
+	bool success = filesys_create(name, initial_size, 0);
 	lock_release(&filesys_lock);
 
 	f->R.rax = success;
@@ -221,7 +223,7 @@ void open_syscall_handler (struct intr_frame *f) {
 
 	char *file_name = f->R.rdi;
 	uintptr_t *fd_table = thread_current()->fd_table;
-	uintptr_t *file_opened;
+	uintptr_t file_opened;
 
 	/* check file_name and fd_count */
 	if (!file_name || thread_current()->fd_count >= FD_MAX) {
@@ -250,7 +252,7 @@ void open_syscall_handler (struct intr_frame *f) {
 
 	/* should not be reached */
 	NOT_REACHED();
-} 
+}
 
 /* 
  * int
@@ -392,7 +394,28 @@ void close_syscall_handler (struct intr_frame *f) {
 		return;	// silently fail...
 
 	lock_acquire(&filesys_lock);
-	file_close(fd_table[fd]);
+	// //
+	// printf ("Printing file to the console...\n");
+	// char *buffer;
+	// buffer = palloc_get_page (PAL_ASSERT);
+	// file_seek(fd_table[fd], 0);
+	// for (;;) {
+	// 	off_t pos = file_tell (fd_table[fd]);
+	// 	off_t n = file_read (fd_table[fd], buffer, PGSIZE);
+	// 	if (n == 0)
+	// 		break;
+
+	// 	hex_dump (pos, buffer, n, true); 
+	// }
+	// palloc_free_page (buffer);
+	// //
+	uintptr_t file_or_dir = fd_table[fd];
+	if (inode_get_type(*(uintptr_t *)file_or_dir) == 0)
+		file_close(fd_table[fd]);
+	else if (inode_get_type(*(uintptr_t *)file_or_dir) == 1)
+		dir_close(fd_table[fd]);
+	else 
+		PANIC("todo : close symbolic link");
 	lock_release(&filesys_lock);
 
 	fd_table[fd] = NULL;
@@ -519,7 +542,21 @@ void munmap_syscall_handler (struct intr_frame *f) {
  * chdir (const char *dir)
  */
 void chdir_syscall_handler (struct intr_frame *f) {
+	assert_valid_address(f->R.rdi, false);
 
+	const char *dir_name = f->R.rdi;
+	bool success = false;
+
+	lock_acquire(&filesys_lock);
+	uintptr_t dir = filesys_open(dir_name);
+	if (dir != NULL) {
+		dir_close(thread_current()->cwd);
+		thread_current()->cwd = dir;
+		success = true;
+	}
+	lock_release(&filesys_lock);
+
+	f->R.rax = success;
 }  
 
 /* 
@@ -527,7 +564,16 @@ void chdir_syscall_handler (struct intr_frame *f) {
  * mkdir (const char *dir)
  */
 void mkdir_syscall_handler (struct intr_frame *f) {
+	assert_valid_address(f->R.rdi, false);
 
+	lock_acquire(&filesys_lock);
+
+	char *dir_name = f->R.rdi;
+	bool success = filesys_create(dir_name, 16 * 20, 1);	// sizeof (struct dir_entry) == 20
+
+	lock_release(&filesys_lock);
+
+	f->R.rax = success;
 }  
 
 /* 
@@ -535,15 +581,43 @@ void mkdir_syscall_handler (struct intr_frame *f) {
  * readdir (int fd, char name[READDIR_MAX_LEN + 1])
  */
 void readdir_syscall_handler (struct intr_frame *f) {
+	assert_valid_address(f->R.rsi, false);
 
-}  
+	int fd = f->R.rdi;
+	char *name = f->R.rsi;
+	intptr_t *fd_table = thread_current()->fd_table;
+
+	/* fd validity check */
+	if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL) {
+		f->R.rax = -1;
+		return;
+	}
+	/* file should represents directory */
+	uintptr_t dir = fd_table[fd];
+	if (inode_get_type(*(uintptr_t *)dir) != 1) {
+		f->R.rax = -1;
+		return;
+	}
+
+	f->R.rax = dir_readdir(dir, name);
+}
 
 /* 
  * bool
  * isdir (int fd)
  */
 void isdir_syscall_handler (struct intr_frame *f) {
+	int fd = f->R.rdi;
+	intptr_t *fd_table = thread_current()->fd_table;
 
+	/* fd validity check */
+	if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL) {
+		f->R.rax = -1;
+		return;
+	}
+	
+	uintptr_t file_or_dir = fd_table[fd];
+	f->R.rax = inode_get_type(*(uintptr_t *)file_or_dir) == 1;
 }  
 
 /* 
@@ -551,7 +625,17 @@ void isdir_syscall_handler (struct intr_frame *f) {
  * inumber (int fd)
  */
 void inumber_syscall_handler (struct intr_frame *f) {
+	int fd = f->R.rdi;
+	intptr_t *fd_table = thread_current()->fd_table;
 
+	/* fd validity check */
+	if (fd < 2 || fd >= FD_MAX || fd_table[fd] == NULL) {
+		f->R.rax = -1;
+		return;
+	}
+
+	uintptr_t file_or_dir = fd_table[fd];
+	f->R.rax = inode_get_inumber(*(uintptr_t *)file_or_dir);
 }  
 
 /* 

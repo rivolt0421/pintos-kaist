@@ -14,8 +14,9 @@
 struct inode_disk {
 	cluster_t start;                	/* First data cluster. */
 	off_t length;                       /* File size in bytes. */
+	char type;							/* 0: file, 1: directory, 2: symbolic link */
 	unsigned magic;                     /* Magic number. */
-	uint32_t unused[125];               /* Not used. */
+	uint32_t unused[124];               /* Not used. */
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -43,11 +44,11 @@ static cluster_t
 byte_to_cluster (const struct inode *inode, off_t pos) {
 	ASSERT (inode != NULL);
 	if (pos < inode->data.length) {
-		cluster_t start = inode->data.start;
+		cluster_t clst = inode->data.start;
 		for (size_t i = 0 ; i < pos / DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER ; i++)
-			start = fat_get(start);
+			clst = fat_get(clst);
 
-		return start;
+		return clst;
 	}
 	else
 		return -1;
@@ -69,7 +70,7 @@ inode_init (void) {
  * Returns true if successful.
  * Returns false if memory or disk allocation fails. */
 bool
-inode_create (cluster_t clst, off_t length) {
+inode_create (cluster_t clst, off_t length, char type) {
 	struct inode_disk *disk_inode = NULL;
 	bool success = false;
 
@@ -84,16 +85,17 @@ inode_create (cluster_t clst, off_t length) {
 	if (disk_inode != NULL) {
 		size_t sectors = bytes_to_sectors (length);
 		disk_inode->length = length;
+		disk_inode->type = type;
 		disk_inode->magic = INODE_MAGIC;
+		disk_inode->start = 0;
 
+		bool data_chain_fail = false;
 		cluster_t start = 0;
-		start = fat_create_chain(0);
-		if (start != 0) {
-			disk_inode->start = start;
-			disk_write (filesys_disk, cluster_to_sector(clst), disk_inode);	// write inode itself.
-			
-			bool create_chain_fail = false;
-			if (sectors > 0) {
+		if (sectors > 0) {
+			start = fat_create_chain(0);
+			if (start != 0) {
+				disk_inode->start = start;
+				
 				static char zeros[DISK_SECTOR_SIZE];
 				cluster_t c;
 
@@ -102,20 +104,24 @@ inode_create (cluster_t clst, off_t length) {
 				for (size_t i = 0; i < sectors - 1; i++) {
 					c = fat_create_chain(c);
 					if (c == 0) {
-						create_chain_fail = true;
+						data_chain_fail = true;
 						break;
 					}
 					disk_write (filesys_disk, cluster_to_sector(c), zeros);	// write for data (subsequent clusters).
 				}
-
 			}
-			if (!create_chain_fail)
-				success = true;
+			else {
+				data_chain_fail = true;
+			}
 		}
+		if (!data_chain_fail) {
+			disk_write (filesys_disk, cluster_to_sector(clst), disk_inode);	// write inode itself.
+			success = true;
+		}
+
 		free (disk_inode);
-		if (!success && start != 0) {
+		if (data_chain_fail && start != 0)
 			fat_remove_chain(start, 0);
-		}
 	}
 	return success;
 }
@@ -167,6 +173,19 @@ inode_get_inumber (const struct inode *inode) {
 	return inode->clst;
 }
 
+/* Returns INODE's type (file type). */
+char
+inode_get_type(struct inode *inode) {
+	return inode->data.type;
+}
+
+/* Returns INODE's open count. */
+int
+inode_get_open_cnt(struct inode *inode) {
+	return inode->open_cnt;
+}
+
+
 /* Closes INODE and writes it to disk.
  * If this was the last reference to INODE, frees its memory.
  * If INODE was also a removed inode, frees its blocks. */
@@ -187,6 +206,7 @@ inode_close (struct inode *inode) {
 			fat_remove_chain(inode->data.start, 0);
 		}
 
+		disk_write (filesys_disk, cluster_to_sector(inode->clst), &inode->data);
 		free (inode); 
 	}
 }
@@ -211,11 +231,11 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) {
 	while (size > 0) {
 		/* Disk sector to read, starting byte offset within sector. */
 		cluster_t clst_idx = byte_to_cluster (inode, offset);
-		int clst_ofs = offset % DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER;
+		int clst_ofs = offset % (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
 
 		/* Bytes left in inode, bytes left in sector, lesser of the two. */
 		off_t inode_left = inode_length (inode) - offset;
-		int clst_left = DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER - clst_ofs;
+		int clst_left = (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER) - clst_ofs;
 		int min_left = inode_left < clst_left ? inode_left : clst_left;
 
 		/* Number of bytes to actually copy out of this sector. */
@@ -266,13 +286,46 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	while (size > 0) {
 		/* Sector to write, starting byte offset within sector. */
 		cluster_t clst_idx = byte_to_cluster (inode, offset);
-		if (clst_idx == -1)
-			PANIC("todo : growth");
-		int clst_ofs = offset % DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER;
+		if (clst_idx == -1) {
+			/* file growth */
+
+			// cluster counts to be.
+			size_t new_length = offset + size;
+			size_t new_cnt = DIV_ROUND_UP(new_length, DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
+			// cluster counts already allocated.
+			size_t curr_cnt = DIV_ROUND_UP(inode->data.length, DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
+			// the number of more clusters needed
+			size_t diff = new_cnt - curr_cnt;
+
+			cluster_t last_clst = inode->data.start;
+			if (last_clst != 0) {
+				int i = 1;
+				while (fat_get(last_clst) != EOChain) {
+					last_clst = fat_get(last_clst);
+					i++;
+				}
+				ASSERT(curr_cnt == i);
+			}
+
+			static char zeros[DISK_SECTOR_SIZE];
+			for (size_t i = 0 ; i < diff ; i++) {
+				last_clst = fat_create_chain(last_clst);
+				if (last_clst == 0)
+					return 0;
+				disk_write (filesys_disk, cluster_to_sector(last_clst), zeros);
+				if (inode->data.start == 0)
+					inode->data.start = last_clst;
+			}
+			inode->data.length = new_length;
+
+			clst_idx = byte_to_cluster(inode, offset);
+		}
+
+		int clst_ofs = offset % (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
 
 		/* Bytes left in inode, bytes left in sector, lesser of the two. */
 		off_t inode_left = inode_length (inode) - offset;
-		int clst_left = DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER - clst_ofs;
+		int clst_left = (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER) - clst_ofs;
 		int min_left = inode_left < clst_left ? inode_left : clst_left;
 
 		/* Number of bytes to actually write into this sector. */
@@ -282,7 +335,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
 		if (clst_ofs == 0 && chunk_size == DISK_SECTOR_SIZE) {
 			/* Write full sector directly to disk. */
-			disk_write (filesys_disk, cluster_to_sector(clst_idx), buffer + bytes_written); 
+			disk_write (filesys_disk, cluster_to_sector(clst_idx), buffer + bytes_written);
 		} else {
 			/* We need a bounce buffer. */
 			if (bounce == NULL) {
@@ -299,7 +352,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 			else
 				memset (bounce, 0, DISK_SECTOR_SIZE);
 			memcpy (bounce + clst_ofs, buffer + bytes_written, chunk_size);
-			disk_write (filesys_disk, cluster_to_sector(clst_idx), bounce); 
+			disk_write (filesys_disk, cluster_to_sector(clst_idx), bounce);
 		}
 
 		/* Advance. */

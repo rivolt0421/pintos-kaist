@@ -11,6 +11,7 @@
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "filesys/directory.h"
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
@@ -51,7 +52,9 @@ process_init (void) {
 	/* initialize for stack growth */
 	current->rsp = NULL;
 	current->user_stack_bottom = USER_STACK;
-
+	
+	/* set the root as the initial process's current directory */
+	current->cwd = dir_open_root();
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.

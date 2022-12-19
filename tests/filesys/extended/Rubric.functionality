@@ -1,26 +1,24 @@
 Functionality of extended file system:
 - Test directory support.
-1	dir-mkdir
-3	dir-mk-tree
-
-1	dir-rmdir
-3	dir-rm-tree
-
-5	dir-vine
+make tests/filesys/extended/dir-mkdir.result VERBOSE=1 &&
+make tests/filesys/extended/dir-mk-tree.result VERBOSE=1 &&
+make tests/filesys/extended/dir-rmdir.result VERBOSE=1 &&
+make tests/filesys/extended/dir-rm-tree.result VERBOSE=1 &&
+make tests/filesys/extended/dir-vine.result VERBOSE=1
 
 - Test file growth.
-1	grow-create
-1	grow-seq-sm
-3	grow-seq-lg
-3	grow-sparse
-3	grow-two-files
-1	grow-tell
-1	grow-file-size
+make tests/filesys/extended/grow-create.result &&
+make tests/filesys/extended/grow-seq-sm.result &&
+make tests/filesys/extended/grow-seq-lg.result &&
+make tests/filesys/extended/grow-sparse.result &&
+make tests/filesys/extended/grow-two-files.result &&
+make tests/filesys/extended/grow-tell.result &&
+make tests/filesys/extended/grow-file-size.result
 
 - Test directory growth.
-1	grow-dir-lg
-1	grow-root-sm
-1	grow-root-lg
+make tests/filesys/extended/grow-dir-lg.result &&
+make tests/filesys/extended/grow-root-sm.result &&
+make tests/filesys/extended/grow-root-lg.result
 
 - Test writing from multiple processes.
 5	syn-rw

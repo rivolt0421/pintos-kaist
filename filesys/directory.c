@@ -5,6 +5,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 /* A directory. */
 struct dir {
@@ -20,10 +21,10 @@ struct dir_entry {
 };
 
 /* Creates a directory with space for ENTRY_CNT entries in the
- * given SECTOR.  Returns true if successful, false on failure. */
+ * given SECTOR. Returns true if successful, false on failure. */
 bool
 dir_create (cluster_t clst, size_t entry_cnt) {
-	return inode_create (clst, entry_cnt * sizeof (struct dir_entry));
+	return inode_create (clst, entry_cnt * sizeof (struct dir_entry), 1);
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -101,20 +102,37 @@ lookup (const struct dir *dir, const char *name,
 /* Searches DIR for a file with the given NAME
  * and returns true if one exists, false otherwise.
  * On success, sets *INODE to an inode for the file, otherwise to
- * a null pointer.  The caller must close *INODE. */
+ * a null pointer. The caller must close *INODE. */
 bool
 dir_lookup (const struct dir *dir, const char *name,
 		struct inode **inode) {
-	struct dir_entry e;
+	struct dir_entry e = {};
+	char *token, *save_ptr;
 
 	ASSERT (dir != NULL);
 	ASSERT (name != NULL);
 
-	if (lookup (dir, name, &e, NULL))
-		*inode = inode_open (e.inode_clst);
-	else
-		*inode = NULL;
+	dir = dir_reopen(dir);
 
+	// name  : "/"   || "/foo/" || "foo/"
+
+	token = strtok_r (name, "/", &save_ptr);
+	while (token != NULL) {
+		if (lookup (dir, token, &e, NULL)) {
+			dir_close(dir);
+			dir = dir_open(inode_open (e.inode_clst));
+		}
+		else {
+			dir_close(dir);
+			*inode = NULL;
+			return false;
+		}
+
+		token = strtok_r (NULL, "/", &save_ptr);
+	}
+
+	dir_close(dir);
+	*inode = inode_open (e.inode_clst);
 	return *inode != NULL;
 }
 
@@ -208,6 +226,8 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 
 	while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) {
 		dir->pos += sizeof e;
+		if (strcmp(e.name, ".") == 0 || strcmp(e.name, "..") == 0)
+			continue;
 		if (e.in_use) {
 			strlcpy (name, e.name, NAME_MAX + 1);
 			return true;

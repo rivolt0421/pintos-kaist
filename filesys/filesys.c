@@ -7,6 +7,8 @@
 #include "filesys/inode.h"
 #include "filesys/directory.h"
 #include "filesys/fat.h"
+#include "threads/thread.h"
+#include "threads/loader.h"
 #include "devices/disk.h"
 
 /* The disk that contains the file system. */
@@ -31,6 +33,9 @@ filesys_init (bool format) {
 		do_format ();
 
 	fat_open ();		// Load FAT directly from the disk
+	struct thread *main_thread = thread_current();
+	ASSERT(main_thread == LOADER_KERN_BASE);
+	main_thread->cwd = dir_open_root();
 	fat_fs_print();
 #else
 	/* Original FS */
@@ -60,15 +65,50 @@ filesys_done (void) {
  * Fails if a file named NAME already exists,
  * or if internal memory allocation fails. */
 bool
-filesys_create (const char *name, off_t initial_size) {
+filesys_create (const char *name, off_t initial_size, char type) {
 	cluster_t inode_clst = 0;
-	struct dir *dir = dir_open_root ();
+	struct dir *base_dir = *name == '/' ? dir_open_root() : dir_reopen(thread_current()->cwd);
+	struct dir *dir = NULL;
+
+	char long_name[READDIR_MAX_LEN+1];
+	strlcpy(long_name, name, READDIR_MAX_LEN+1);	// copy NAME
+
+	char *dirname = long_name;
+	char filename[READDIR_MAX_LEN+1];
+	char *f = strrchr(long_name, '/');
+	if (f != NULL) {	// name : "/foo" || "/foo/bar" || "foo/bar"
+		f++; 
+		strlcpy (filename, f, READDIR_MAX_LEN+1);
+		*f = '\0';							// dirname  : "/"   || "/foo/" || "foo/"
+											// filename : "foo" || "bar"   || "bar"
+		
+		if (strcmp(dirname, "/") == 0) {
+			dir = dir_open_root(); 
+		}
+		else {
+			struct inode *inode;
+			if(dir_lookup(base_dir, dirname, &inode))
+				dir = dir_open(inode);
+		}
+	}
+	else {				// name : "foo"
+		strlcpy (filename, long_name, READDIR_MAX_LEN+1);
+		dir = dir_reopen(thread_current()->cwd);
+	}
+
 	bool success = (dir != NULL
 			&& (inode_clst = fat_create_chain (0))
-			&& inode_create (inode_clst, initial_size)
-			&& dir_add (dir, name, inode_clst));
+			&& inode_create (inode_clst, initial_size, type)
+			&& dir_add (dir, filename, inode_clst));
 	if (!success)
 		fat_remove_chain(inode_clst, 0);
+	else if (type == 1) {
+		struct dir *new_dir = dir_open(inode_open(inode_clst));
+		dir_add(new_dir, ".", inode_clst);
+		dir_add(new_dir, "..", inode_get_inumber(*(uintptr_t *)dir));
+		dir_close(new_dir);
+	}
+	dir_close (base_dir);
 	dir_close (dir);
 
 	return success;
@@ -79,16 +119,29 @@ filesys_create (const char *name, off_t initial_size) {
  * otherwise.
  * Fails if no file named NAME exists,
  * or if an internal memory allocation fails. */
-struct file *
+uintptr_t
 filesys_open (const char *name) {
-	struct dir *dir = dir_open_root ();
+	struct dir *base_dir = *name == '/' ? dir_open_root() : dir_reopen(thread_current()->cwd);
+	char long_name[READDIR_MAX_LEN+1];
+	strlcpy(long_name, name, READDIR_MAX_LEN+1);
+	long_name[strlen(name)] = '/';
+	long_name[strlen(name)+1] = '\0';
+
 	struct inode *inode = NULL;
 
-	if (dir != NULL)
-		dir_lookup (dir, name, &inode);
-	dir_close (dir);
+	if (base_dir != NULL)
+		dir_lookup (base_dir, long_name, &inode);
+	dir_close (base_dir);
 
-	return file_open (inode);
+	if (inode == NULL)
+		return NULL;
+
+	if (inode_get_type(inode) == 0)
+		return file_open (inode);
+	else if (inode_get_type(inode) == 1)
+		return dir_open (inode);
+	else
+		PANIC("todo : open symbolic link");
 }
 
 /* Deletes the file named NAME.
@@ -97,10 +150,54 @@ filesys_open (const char *name) {
  * or if an internal memory allocation fails. */
 bool
 filesys_remove (const char *name) {
-	struct dir *dir = dir_open_root ();
-	bool success = dir != NULL && dir_remove (dir, name);
-	dir_close (dir);
+	struct dir *base_dir = *name == '/' ? dir_open_root() : dir_reopen(thread_current()->cwd);
+	struct dir *dir = NULL;
 
+	char long_name[READDIR_MAX_LEN+1];
+	strlcpy(long_name, name, READDIR_MAX_LEN+1);	// copy NAME
+
+	char *dirname = long_name;
+	char filename[READDIR_MAX_LEN+1];
+	char *f = strrchr(long_name, '/');
+	if (f != NULL) {	// name : "/foo" || "/foo/bar" || "foo/bar"
+		f++; 
+		strlcpy (filename, f, READDIR_MAX_LEN+1);
+		*f = '\0';							// dirname  : "/"   || "/foo/" || "foo/"
+											// filename : "foo" || "bar"   || "bar"
+		struct inode *inode;
+		if(dir_lookup(base_dir, dirname, &inode))
+			dir = dir_open(inode);
+	}
+	else {				// name : "foo"
+		strlcpy (filename, long_name, READDIR_MAX_LEN+1);
+		dir = dir_reopen(thread_current()->cwd);
+	}
+
+	bool success = false;
+	if (dir == NULL)
+		return false;
+	else {
+		struct inode *inode;
+		if (dir_lookup(dir, filename, &inode)) {
+			if (inode_get_type(inode) == 0) {		// file
+				inode_close(inode);
+				success = true;
+			}
+			else if (inode_get_type(inode) == 1) {	// directory
+				struct dir *subdir = dir_open(inode);
+				char name[NAME_MAX + 1];
+				success = !dir_readdir(subdir, name)
+						&& inode_get_open_cnt(inode) <= 1;		// should not be opened by other process.
+				dir_close(subdir);
+			}
+			else
+				PANIC("todo : remove symbolic link");
+		}
+	}
+	if (success)
+		success = dir_remove(dir, filename);
+
+	dir_close (dir);
 	return success;
 }
 
@@ -112,7 +209,10 @@ do_format (void) {
 #ifdef EFILESYS
 	/* Create FAT and save it to the disk. */
 	fat_create ();
-	if (!dir_create (ROOT_DIR_CLUSTER, 16))
+	bool init_root = dir_create (ROOT_DIR_CLUSTER, 16)
+					&& dir_add(dir_open_root(), ".", ROOT_DIR_CLUSTER)
+					&& dir_add(dir_open_root(), "..", ROOT_DIR_CLUSTER);
+	if (!init_root)
 		PANIC ("root directory creation failed");
 	fat_close ();
 #else
