@@ -11,7 +11,7 @@
 typedef uint32_t cluster_t;  /* Index of a cluster within FAT. */
 
 #define FAT_MAGIC 0xEB3C9000 /* MAGIC string to identify FAT disk */
-#define EOChain 0x0FFFFFFF   /* End of cluster chain */
+#define EOChain 0x0FFFFFFF   /* End of cluster chain */     // in practice, stored in the second entry of the FAT. hard coded only in pintos.
 
 /* Sectors of FAT information. */
 #define SECTORS_PER_CLUSTER 1 /* Number of sectors per cluster */

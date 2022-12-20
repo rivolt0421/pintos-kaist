@@ -131,6 +131,10 @@ struct thread {
 	void *user_stack_bottom;
 #endif
 
+#ifdef EFILESYS
+	uintptr_t cwd;	// file struct address of executable file for this process
+#endif
+
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
